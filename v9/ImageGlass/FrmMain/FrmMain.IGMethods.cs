@@ -879,6 +879,8 @@ public partial class FrmMain
     /// </summary>
     public void IG_CopyFiles()
     {
+        IG_ClearClipboard();    // MK2k: we don't want to stack copied files; TODO: implement this as option
+
         // get file path
         var filePath = Local.Images.GetFilePath(Local.CurrentIndex);
 
@@ -1023,7 +1025,7 @@ public partial class FrmMain
             Clipboard.Clear();
         }
 
-        PicMain.ShowMessage(Config.Language[$"{Name}.{nameof(MnuClearClipboard)}._ClearClipboard"], Config.InAppMessageDuration);
+        PicMain.ShowMessage(Config.Language[$"{Name}.{nameof(MnuClearClipboard)}._Success"], Config.InAppMessageDuration);
     }
 
 
