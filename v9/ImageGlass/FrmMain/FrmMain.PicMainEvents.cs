@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -18,10 +18,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 using ImageGlass.Base;
-using ImageGlass.Base.Photoing.Codecs;
 using ImageGlass.Settings;
 using ImageGlass.Views;
-using System.Windows.Controls;
 
 namespace ImageGlass;
 
@@ -79,7 +77,7 @@ public partial class FrmMain
         if (e.Data is null || !e.Data.GetDataPresent(DataFormats.FileDrop))
             return;
 
-        var filePaths = (string[])e.Data.GetData(DataFormats.FileDrop, false);
+        var filePaths = (string[]?)e.Data.GetData(DataFormats.FileDrop, false);
 
         if (filePaths.Length > 1)
         {
@@ -341,19 +339,25 @@ public partial class FrmMain
     }
 
 
-    private void PicMain_OnNavLeftClicked(MouseEventArgs e)
+    private void PicMain_OnNavLeftClicked(object? sender, MouseEventArgs e)
     {
         _ = ViewNextCancellableAsync(-1);
     }
 
-    private void PicMain_OnNavRightClicked(MouseEventArgs e)
+    private void PicMain_OnNavRightClicked(object? sender, MouseEventArgs e)
     {
         _ = ViewNextCancellableAsync(1);
     }
 
-    private void PicMain_OnZoomChanged(ZoomEventArgs e)
+    private void PicMain_OnZoomChanged(object? sender, ZoomEventArgs e)
     {
-        UpdateImageInfo(ImageInfoUpdateTypes.Zoom);
+        // Handle window fit after zoom change
+        if (Config.EnableWindowFit && (e.IsManualZoom || e.IsZoomModeChange))
+        {
+            FitWindowToImage(false);
+        }
+
+        LoadImageInfo(ImageInfoUpdateTypes.Zoom);
     }
 
 }

@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -25,6 +25,7 @@ using System.Drawing.Imaging;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text.RegularExpressions;
+using System.Windows;
 using System.Windows.Media.Imaging;
 using WicNet;
 using ColorProfile = ImageMagick.ColorProfile;
@@ -42,7 +43,6 @@ public partial class BHelper
         if (bmp == null)
             return null;
 
-
         var prop = bmp.GetType().GetProperty("WicSourceHandle",
             BindingFlags.NonPublic | BindingFlags.Instance);
 
@@ -53,21 +53,38 @@ public partial class BHelper
         var obj = Marshal.GetObjectForIUnknown(srcHandle.DangerousGetHandle());
 
         var wicSrc = new WicBitmapSource(obj);
-        wicSrc.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        try
+        {
+            wicSrc.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        }
+        catch (InvalidOperationException)
+        {
+            // cannot convert format
+            return null;
+        }
 
         return wicSrc;
     }
 
-    
+
     /// <summary>
     /// Converts <see cref="Bitmap"/> to <see cref="WicBitmapSource"/>.
     /// </summary>
     public static WicBitmapSource? ToWicBitmapSource(Bitmap? bmp)
     {
         if (bmp == null) return null;
-        
+
         var wicSrc = WicBitmapSource.FromHBitmap(bmp.GetHbitmap());
-        wicSrc.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+
+        try
+        {
+            wicSrc.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        }
+        catch (InvalidOperationException)
+        {
+            // cannot convert format
+            return null;
+        }
 
         return wicSrc;
     }
@@ -93,7 +110,15 @@ public partial class BHelper
         if (stream == null) return null;
 
         var wicSrc = WicBitmapSource.Load(stream);
-        wicSrc.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        try
+        {
+            wicSrc.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        }
+        catch (InvalidOperationException)
+        {
+            // cannot convert format
+            return null;
+        }
 
         return wicSrc;
     }
@@ -147,11 +172,19 @@ public partial class BHelper
 
         if (src == null) return null;
 
-        src.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        try
+        {
+            src.ConvertTo(WicPixelFormat.GUID_WICPixelFormat32bppPBGRA);
+        }
+        catch (InvalidOperationException)
+        {
+            // cannot convert format
+            return null;
+        }
         return src;
     }
 
-    
+
     /// <summary>
     /// Converts <see cref="WicBitmapSource"/> to <see cref="Bitmap"/>.
     /// https://stackoverflow.com/a/2897325/2856887
@@ -172,6 +205,33 @@ public partial class BHelper
           PixelFormat.Format32bppPArgb);
 
         source.CopyPixels(data.Height * data.Stride, data.Scan0, data.Stride);
+
+        bmp.UnlockBits(data);
+
+        return bmp;
+    }
+
+
+    /// <summary>
+    /// Converts <see cref="BitmapSource"/> to <see cref="Bitmap"/>.
+    /// https://stackoverflow.com/a/2897325/2856887
+    /// </summary>
+    public static Bitmap? ToGdiPlusBitmap(BitmapSource? source)
+    {
+        if (source == null)
+            return null;
+
+        var bmp = new Bitmap(
+          (int)source.Width,
+          (int)source.Height,
+          PixelFormat.Format32bppPArgb);
+
+        var data = bmp.LockBits(
+          new Rectangle(new(0, 0), bmp.Size),
+          ImageLockMode.WriteOnly,
+          PixelFormat.Format32bppPArgb);
+
+        source.CopyPixels(Int32Rect.Empty, data.Scan0, data.Height * data.Stride, data.Stride);
 
         bmp.UnlockBits(data);
 
@@ -588,7 +648,7 @@ public partial class BHelper
         var y = (int)srcSelection.Y;
 
         return WicBitmapSource.FromSourceRect(img, x, y, width, height);
-    }    
+    }
 
 }
 

@@ -25,7 +25,7 @@ using ImageGlass.Views;
 
 namespace ImageGlass;
 
-public partial class FrmCrop : ToolForm, IToolForm
+public partial class FrmCrop : ToolForm, IToolForm<CropToolConfig>
 {
     private Keys _squareRatioSelectionKey = Keys.Shift | Keys.ShiftKey;
     private bool _isSquareRatioSelectionKeyPressed = false;
@@ -33,15 +33,7 @@ public partial class FrmCrop : ToolForm, IToolForm
     private Rectangle _lastSelectionArea = Rectangle.Empty;
 
 
-    /// <summary>
-    /// Gets tool id.
-    /// </summary>
     public string ToolId => "CropTool";
-
-
-    /// <summary>
-    /// Gets, sets settings for this tool, written in app's config file.
-    /// </summary>
     public CropToolConfig Settings { get; set; }
 
 
@@ -50,7 +42,7 @@ public partial class FrmCrop : ToolForm, IToolForm
         InitializeComponent();
     }
 
-    public FrmCrop(Form owner, IgTheme theme) : base(theme)
+    public FrmCrop(Form owner) : base()
     {
         InitializeComponent();
         if (DesignMode) return;
@@ -58,7 +50,7 @@ public partial class FrmCrop : ToolForm, IToolForm
         Owner = owner;
         Settings = new(ToolId);
 
-        ApplyTheme(Theme.Settings.IsDarkMode);
+        ApplyTheme(Config.Theme.Settings.IsDarkMode);
     }
 
 
@@ -73,9 +65,20 @@ public partial class FrmCrop : ToolForm, IToolForm
         // show backdrop effect for title and footer
         BackdropMargin = new Padding(0, 0, 0, TableBottom.Height);
 
-        TableBottom.BackColor = darkMode
-            ? Color.White.WithAlpha(10)
-            : Color.White.WithAlpha(220);
+        if (EnableTransparent)
+        {
+            TableBottom.BackColor = darkMode
+                ? Color.White.WithAlpha(10)
+                : Color.White.WithAlpha(200);
+        }
+        else
+        {
+            BackColor = Config.Theme.ColorPalatte.AppBackground;
+
+            TableBottom.BackColor = darkMode
+                ? Color.White.WithAlpha(15)
+                : Color.Black.WithAlpha(15);
+        }
 
         TableTop.BackColor = Config.Theme.ColorPalatte.AppBackground;
 
@@ -90,19 +93,8 @@ public partial class FrmCrop : ToolForm, IToolForm
         base.OnDpiChanged(e);
 
         OnUpdateHeight();
-        ApplyTheme(Theme.Settings.IsDarkMode);
+        ApplyTheme(Config.Theme.Settings.IsDarkMode);
     }
-
-
-    //protected override void OnRequestUpdatingColorMode(SystemColorModeChangedEventArgs e)
-    //{
-    //    // update theme here
-    //    ApplyTheme(e.IsDarkMode);
-    //    Invalidate(true);
-
-    //    base.OnRequestUpdatingColorMode(e);
-    //}
-
 
     protected override void OnLoad(EventArgs e)
     {
@@ -133,13 +125,6 @@ public partial class FrmCrop : ToolForm, IToolForm
         NumY.LostFocus += NumSelections_LostFocus;
         NumWidth.LostFocus += NumSelections_LostFocus;
         NumHeight.LostFocus += NumSelections_LostFocus;
-
-
-        // set default location offset on the parent form
-        var padding = DpiApi.Transform(10);
-        var x = padding;
-        var y = DpiApi.Transform(SystemInformation.CaptionHeight + Constants.TOOLBAR_ICON_HEIGHT * 2) + padding;
-        InitLocation = new Point(x, y);
 
         base.OnLoad(e);
 
@@ -192,6 +177,7 @@ public partial class FrmCrop : ToolForm, IToolForm
         };
 
         Settings.SaveToAppConfig();
+        Local.FrmMain.Activate();
     }
 
 
@@ -459,6 +445,12 @@ public partial class FrmCrop : ToolForm, IToolForm
 
         Local.FrmMain.PicMain.SourceSelection = new RectangleF(x, y, w, h);
 
+        // set buttons state
+        BtnSave.Enabled =
+            BtnSaveAs.Enabled =
+            BtnCrop.Enabled =
+            BtnCopy.Enabled = !Local.FrmMain.PicMain.SourceSelection.IsEmpty;
+
 
         _isDefaultSelectionLoaded = true;
         if (drawSelection)
@@ -488,7 +480,7 @@ public partial class FrmCrop : ToolForm, IToolForm
                 Local.FrmMain.PicMain.UpdateSelectionByMousePosition();
             }
 
-            
+
             Local.FrmMain.PicMain.Invalidate();
         }
     }
@@ -521,7 +513,7 @@ public partial class FrmCrop : ToolForm, IToolForm
     }
 
 
-    private void PicMain_OnImageSelecting(Views.SelectionEventArgs e)
+    private void PicMain_OnImageSelecting(object? sender, Views.SelectionEventArgs e)
     {
         NumX.Value = (decimal)e.SourceSelection.X;
         NumY.Value = (decimal)e.SourceSelection.Y;
@@ -535,7 +527,7 @@ public partial class FrmCrop : ToolForm, IToolForm
     }
 
 
-    private void PicMain_ImageLoading()
+    private void PicMain_ImageLoading(object? sender, EventArgs e)
     {
         _isDefaultSelectionLoaded = false;
         _lastSelectionArea = new Rectangle(
@@ -546,7 +538,7 @@ public partial class FrmCrop : ToolForm, IToolForm
     }
 
 
-    private void PicMain_ImageDrawn()
+    private void PicMain_ImageDrawn(object? sender, EventArgs e)
     {
         TableTop.Enabled =
             TableBottom.Enabled = Local.FrmMain.PicMain.Source != ImageSource.Null;
@@ -572,13 +564,13 @@ public partial class FrmCrop : ToolForm, IToolForm
         Local.FrmMain.PicMain.SelectionAspectRatio = new SizeF((float)NumRatioFrom.Value, (float)NumRatioTo.Value);
     }
 
-    
+
     private void NumSelections_LostFocus(object? sender, EventArgs e)
     {
         LoadSelectionFromFormInputs(true);
     }
 
-    
+
     private void BtnSave_Click(object sender, EventArgs e)
     {
         Local.FrmMain.IG_Save();
@@ -615,7 +607,12 @@ public partial class FrmCrop : ToolForm, IToolForm
 
     private void BtnSettings_Click(object sender, EventArgs e)
     {
-        using var frm = new FrmCropSettings(Settings);
+        using var frm = new FrmCropSettings(Settings)
+        {
+            StartPosition = FormStartPosition.Manual,
+            Left = Left,
+            Top = Bottom,
+        };
 
         if (frm.ShowDialog(this) == DialogResult.OK)
         {

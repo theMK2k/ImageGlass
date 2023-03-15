@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -37,6 +37,7 @@ public static class ImageInfo
     public static string? ExifDateTimeOriginal { get; set; } = null;
 
     public static string? DateTimeAuto { get; set; } = null;
+    public static string? ColorSpace { get; set; } = null;
 
 
     public static bool IsNull => AppName == null
@@ -53,7 +54,8 @@ public static class ImageInfo
         && ExifDateTime == null
         && ExifDateTimeOriginal == null
 
-        && ExifRating == null;
+        && ExifRating == null
+        && ColorSpace == null;
 
 
     /// <summary>
@@ -76,7 +78,8 @@ public static class ImageInfo
                 ExifRating =
                 ExifDateTime =
                 ExifDateTimeOriginal =
-                DateTimeAuto = null;
+                DateTimeAuto =
+                ColorSpace = null;
 
             if (!string.IsNullOrEmpty(clipboardImageText))
             {

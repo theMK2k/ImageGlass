@@ -102,14 +102,14 @@ public static class Functions
                     ? Config.Language[$"{langPath}._SuccessDescription"]
                     : string.Empty;
 
-                _ = Config.ShowInfo(
+                _ = Config.ShowInfo(null,
                     description: description,
                     title: Config.Language[langPath],
                     heading: Config.Language[$"{langPath}._Success"]);
             }
             else if (exitCode != IgExitCode.AdminRequired || !hideAdminRequiredErrorUi)
             {
-                _ = Config.ShowError(
+                _ = Config.ShowError(null,
                     description: error.Message,
                     title: Config.Language[langPath],
                     heading: Config.Language[$"{langPath}._Error"],
@@ -120,4 +120,62 @@ public static class Functions
 
         return exitCode;
     }
+
+
+    /// <summary>
+    /// Opens folder picker and export image frames
+    /// </summary>
+    public static IgExitCode ExportImageFrames(string filePath)
+    {
+        if (!File.Exists(filePath))
+        {
+            _ = Config.ShowError(null,
+                filePath,
+                Config.Language[$"{nameof(FrmExportFrames)}._Title"],
+                Config.Language[$"{nameof(FrmExportFrames)}._FileNotExist"]);
+
+            return IgExitCode.Error;
+        }
+
+
+        var destDirPath = Functions.OpenFolderPicker(Config.Language[$"{nameof(FrmExportFrames)}._FolderPickerTitle"]);
+
+        if (!string.IsNullOrEmpty(destDirPath))
+        {
+            Application.Run(new FrmExportFrames(filePath, destDirPath));
+        }
+
+
+        return IgExitCode.Done;
+    }
+
+
+    /// <summary>
+    /// Opens folder picker and exports image frames.
+    /// </summary>
+    public static string OpenFolderPicker(string title = "")
+    {
+        using var fb = new FolderBrowserDialog()
+        {
+            Description = title,
+            ShowNewFolderButton = true,
+            UseDescriptionForTitle = true,
+            AutoUpgradeEnabled = true,
+
+#if NET7_0_OR_GREATER
+            ShowPinnedPlaces = true,
+#endif
+        };
+        var result = fb.ShowDialog();
+
+
+        if (result == DialogResult.OK && Directory.Exists(fb.SelectedPath))
+        {
+            return fb.SelectedPath;
+        }
+
+        return string.Empty;
+    }
+
+
 }

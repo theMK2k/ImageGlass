@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -18,14 +18,16 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 using System.Runtime.InteropServices;
 
-namespace ImageGlass.Base.DirectoryComparer; 
+namespace ImageGlass.Base.DirectoryComparer;
 
 
-public class WindowsDirectoryNaturalSort: IComparer<string> {
+public class WindowsDirectoryNaturalSort : IComparer<string>
+{
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int StrCmpLogicalW(string x, string y);
 
-    public int Compare(string? filePath1, string? filePath2) {
+    public int Compare(string? filePath1, string? filePath2)
+    {
         var basename1 = Path.GetDirectoryName(filePath1) ?? "";
         var basename2 = Path.GetDirectoryName(filePath2) ?? "";
 
@@ -34,13 +36,15 @@ public class WindowsDirectoryNaturalSort: IComparer<string> {
 }
 
 
-public class ReverseWindowsDirectoryNaturalSort: IComparer<string> {
+public class ReverseWindowsDirectoryNaturalSort : IComparer<string>
+{
     [DllImport("shlwapi.dll", CharSet = CharSet.Unicode, ExactSpelling = true)]
     private static extern int StrCmpLogicalW(string x, string y);
 
-    public int Compare(string? filePath1, string? filePath2) {
+    public int Compare(string? filePath1, string? filePath2)
+    {
         var basename1 = Path.GetDirectoryName(filePath2) ?? "";
-        var basename2 =  Path.GetDirectoryName(filePath1) ?? "";
+        var basename2 = Path.GetDirectoryName(filePath1) ?? "";
 
         return StrCmpLogicalW(basename1, basename2);
     }

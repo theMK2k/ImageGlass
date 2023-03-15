@@ -16,7 +16,6 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
-using DirectN;
 using ImageGlass.Base;
 using ImageGlass.Base.Actions;
 using ImageGlass.Base.DirectoryComparer;
@@ -37,7 +36,7 @@ public partial class FrmMain : ModernForm
 {
     // cancellation tokens of synchronious task
     private CancellationTokenSource _loadCancelToken = new();
-    private readonly MovableForm _movableForm;
+    private MovableForm _movableForm;
     private bool _isShowingImagePreview = false;
 
 
@@ -55,11 +54,7 @@ public partial class FrmMain : ModernForm
         // update the DpiApi when DPI changed.
         EnableDpiApiUpdate = true;
 
-        // hide the root layout to avoid flickering render,
-        // and show again when window is loaded
-        Tb0.Visible = false;
-        _movableForm = new(this);
-
+        // update form settings according to user config
         SetUpFrmMainConfigs();
 
         // update theme icons
@@ -70,24 +65,24 @@ public partial class FrmMain : ModernForm
 
     private void FrmMain_Load(object sender, EventArgs e)
     {
-        Local.OnImageLoading += Local_OnImageLoading;
-        Local.OnImageListLoaded += Local_OnImageListLoaded;
-        Local.OnImageLoaded += Local_OnImageLoaded;
-        Local.OnFirstImageReached += Local_OnFirstImageReached;
-        Local.OnLastImageReached += Local_OnLastImageReached;
+        SetupFileWatcher();
+
+        Local.ImageLoading += Local_ImageLoading;
+        Local.ImageListLoaded += Local_ImageListLoaded;
+        Local.ImageLoaded += Local_ImageLoaded;
+        Local.FirstImageReached += Local_FirstImageReached;
+        Local.LastImageReached += Local_LastImageReached;
+        Local.ImageTransform.Changed += ImageTransform_Changed;
+
+        Application.ApplicationExit += Application_ApplicationExit;
 
         LoadImagesFromCmdArgs(Environment.GetCommandLineArgs());
     }
-
 
     protected override void OnDpiChanged()
     {
         base.OnDpiChanged();
         SuspendLayout();
-
-        // fix splitter
-        Sp1.SplitterWidth = Math.Max(1, this.ScaleToDpi(1));
-        Sp2.SplitterWidth = Math.Max(1, this.ScaleToDpi(1));
 
         // scale toolbar icons corresponding to DPI
         var newIconHeight = this.ScaleToDpi(Config.ToolbarIconHeight);
@@ -100,21 +95,27 @@ public partial class FrmMain : ModernForm
 
         // update picmain scaling
         PicMain.NavButtonSize = this.ScaleToDpi(new SizeF(60f, 60f));
-        PicMain.CheckerboardCellSize = this.ScaleToDpi(8f);
+        PicMain.CheckerboardCellSize = this.ScaleToDpi(Constants.VIEWER_GRID_SIZE);
 
         // gallery
         UpdateGallerySize();
-        
+
         ResumeLayout(false);
     }
 
     protected override void OnDpiChanged(DpiChangedEventArgs e)
     {
         base.OnDpiChanged(e);
-        
+
         MnuMain.CurrentDpi =
             MnuContext.CurrentDpi =
             MnuSubMenu.CurrentDpi = e.DeviceDpiNew;
+    }
+
+
+    private void Application_ApplicationExit(object? sender, EventArgs e)
+    {
+        DisposeFileWatcher();
     }
 
 
@@ -239,7 +240,7 @@ public partial class FrmMain : ModernForm
 
     private void Gallery_ItemTooltipShowing(object sender, ItemTooltipShowingEventArgs e)
     {
-        var langPath = $"{nameof(FrmMain)}.{nameof(Gallery)}.Tooltip";
+        var langPath = "_.Metadata";
 
         // build tooltip content
         var sb = new StringBuilder();
@@ -248,16 +249,32 @@ public partial class FrmMain : ModernForm
         sb.AppendLine($"{Config.Language[$"{langPath}._{nameof(IgMetadata.FileLastWriteTime)}"]}: {e.Item.Details.FileLastWriteTimeFormated}");
         var tooltipLinesCount = 4;
 
+        // FramesCount
         if (e.Item.Details.FramesCount > 1)
         {
             sb.AppendLine($"{Config.Language[$"{langPath}._{nameof(IgMetadata.FramesCount)}"]}: {e.Item.Details.FramesCount}");
             tooltipLinesCount++;
         }
 
+        // Rating
         var rating = BHelper.FormatStarRatingText(e.Item.Details.ExifRatingPercent);
         if (!string.IsNullOrEmpty(rating))
         {
-            sb.AppendLine($"{Config.Language[$"{langPath}._Rating"]}: {rating}");
+            sb.AppendLine($"{Config.Language[$"{langPath}._{nameof(IgMetadata.ExifRatingPercent)}"]}: {rating}");
+            tooltipLinesCount++;
+        }
+
+        // ColorSpace
+        if (!string.IsNullOrEmpty(e.Item.Details.ColorSpace))
+        {
+            sb.AppendLine($"{Config.Language[$"{langPath}._{nameof(IgMetadata.ColorSpace)}"]}: {e.Item.Details.ColorSpace}");
+            tooltipLinesCount++;
+        }
+
+        // ColorProfile
+        if (!string.IsNullOrEmpty(e.Item.Details.ColorProfile))
+        {
+            sb.AppendLine($"{Config.Language[$"{langPath}._{nameof(IgMetadata.ColorProfile)}"]}: {e.Item.Details.ColorProfile}");
             tooltipLinesCount++;
         }
 
@@ -301,7 +318,7 @@ public partial class FrmMain : ModernForm
         }
 
         if (string.IsNullOrEmpty(pathToLoad)
-            && Config.OpenLastSeenImage
+            && Config.ShouldOpenLastSeenImage
             && File.Exists(Config.LastSeenImagePath))
         {
             pathToLoad = Config.LastSeenImagePath;
@@ -319,8 +336,7 @@ public partial class FrmMain : ModernForm
     /// Prepare and loads images from the input path
     /// </summary>
     /// <param name="inputPath">
-    /// The relative/absolute path of file/folder;
-    /// or a URI Scheme
+    /// The relative/absolute path of file/folder; or a protocol path
     /// </param>
     public void PrepareLoading(string inputPath)
     {
@@ -445,9 +461,7 @@ public partial class FrmMain : ModernForm
                 if (firstPath)
                 {
                     firstPath = false;
-
-                    // TODO:
-                    //WatchPath(dirPath);
+                    StartFileWatcher(dirPath);
 
                     // Seek for explorer sort order
                     DetermineSortOrder(dirPath);
@@ -474,7 +488,7 @@ public partial class FrmMain : ModernForm
             var sortedFilesList = BHelper.SortImageList(allFilesToLoad,
                 Local.ActiveImageLoadingOrder,
                 Local.ActiveImageLoadingOrderType,
-                Config.GroupImagesByDirectory);
+                Config.ShouldGroupImagesByDirectory);
 
             // add to image list
             Local.InitImageList(sortedFilesList, distinctDirsList);
@@ -552,7 +566,7 @@ public partial class FrmMain : ModernForm
         Local.ActiveImageLoadingOrderType = Config.ImageLoadingOrderType;
 
         // Use File Explorer sort order if possible
-        if (Config.UseFileExplorerSortOrder)
+        if (Config.ShouldUseExplorerSortOrder)
         {
             if (ExplorerSortOrder.GetExplorerSortOrder(fullPath, out var explorerOrder, out var isAscending))
             {
@@ -592,7 +606,7 @@ public partial class FrmMain : ModernForm
                 var extension = fi.Extension.ToLower();
 
                 // checks if image is hidden and ignores it if so
-                if (!Config.IncludeHiddenImages)
+                if (!Config.ShouldLoadHiddenImages)
                 {
                     var attributes = fi.Attributes;
                     var isHidden = (attributes & FileAttributes.Hidden) != 0;
@@ -631,6 +645,7 @@ public partial class FrmMain : ModernForm
         }
 
         Gallery.ResumeLayout();
+        UpdateGallerySize();
 
         SelectCurrentThumbnail();
     }
@@ -674,14 +689,14 @@ public partial class FrmMain : ModernForm
         string filename = "",
         CancellationTokenSource? token = null)
     {
-        Local.CurrentChanges.Clear();
+        Local.ImageTransform.Clear();
 
         if (Local.Images.Length == 0 && string.IsNullOrEmpty(filename))
         {
             Local.CurrentIndex = -1;
             Local.Metadata = null;
 
-            UpdateImageInfo(ImageInfoUpdateTypes.All);
+            LoadImageInfo(ImageInfoUpdateTypes.All);
 
             return;
         }
@@ -691,7 +706,7 @@ public partial class FrmMain : ModernForm
         var readSettings = new CodecReadOptions()
         {
             ColorProfileName = Config.ColorProfile,
-            ApplyColorProfileForAll = Config.ApplyColorProfileForAll,
+            ApplyColorProfileForAll = Config.ShouldUseColorProfileForAll,
             ImageChannel = Local.ImageChannel,
             AutoScaleDownLargeImage = true,
             UseEmbeddedThumbnailRawFormats = Config.UseEmbeddedThumbnailRawFormats,
@@ -701,8 +716,8 @@ public partial class FrmMain : ModernForm
         };
 
 
-        // Validate image index & load image metadata
-        #region Validate image index & load image metadata
+        // Validate image index
+        #region Validate image index
 
         // temp index
         var imageIndex = Local.CurrentIndex + step;
@@ -759,17 +774,21 @@ public partial class FrmMain : ModernForm
             Local.CurrentIndex = imageIndex;
         }
 
+        #endregion // Validate image index
 
 
-        var loadingArgs = new ImageLoadingEventArgs()
+        // set busy state
+        Local.IsBusy = true;
+        var imgFilePath = string.IsNullOrEmpty(filename)
+            ? Local.Images.GetFilePath(Local.CurrentIndex)
+            : filename;
+
+        Local.RaiseImageLoadingEvent(new ImageLoadingEventArgs()
         {
             CurrentIndex = Local.CurrentIndex,
             NewIndex = imageIndex,
-            FilePath = string.IsNullOrEmpty(filename) ? Local.Images.GetFilePath(Local.CurrentIndex) : filename,
-        };
-        Local.RaiseImageLoadingEvent(loadingArgs);
-
-        #endregion // Validate image index & load image metadata
+            FilePath = imgFilePath,
+        });
 
 
         try
@@ -807,35 +826,34 @@ public partial class FrmMain : ModernForm
                 token?.Token.ThrowIfCancellationRequested();
 
 
-                var loadedArgs = new ImageLoadedEventArgs()
+                Local.RaiseImageLoadedEvent(new ImageLoadedEventArgs()
                 {
                     Index = imageIndex,
+                    FilePath = imgFilePath,
                     Data = photo,
                     Error = photo?.Error,
                     ResetZoom = resetZoom,
-                };
-                Local.RaiseImageLoadedEvent(loadedArgs);
+                });
             }
 
-
-            // Collect system garbage
-            GC.Collect();
-            GC.WaitForPendingFinalizers();
-            GC.Collect();
         }
         catch (OperationCanceledException)
         {
             Local.Images.CancelLoading(imageIndex);
+
+            Local.RaiseImageUnloadedEvent(new ImageUnloadedEventArgs()
+            {
+                Index = imageIndex,
+                FilePath = imgFilePath,
+            });
         }
-        //catch (Exception ex)
-        //{
-        //    Local.RaiseImageLoadedEvent(new()
-        //    {
-        //        Index = imageIndex,
-        //        Error = ex,
-        //        ResetZoom = resetZoom,
-        //    });
-        //}
+
+        Local.IsBusy = false;
+
+        // Collect system garbage
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
     }
 
 
@@ -864,7 +882,7 @@ public partial class FrmMain : ModernForm
 
     #region Local.Images event
 
-    private void Local_OnImageLoading(ImageLoadingEventArgs e)
+    private void Local_ImageLoading(ImageLoadingEventArgs e)
     {
         Local.IsImageError = false;
 
@@ -883,16 +901,16 @@ public partial class FrmMain : ModernForm
             ShowImagePreview(e.FilePath, _loadCancelToken.Token);
         }
 
-        _ = Task.Run(() => UpdateImageInfo(ImageInfoUpdateTypes.All, e.FilePath));
+        _ = Task.Run(() => LoadImageInfo(ImageInfoUpdateTypes.All, e.FilePath));
     }
 
 
     [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP007:Don't dispose injected", Justification = "<Pending>")]
-    private void Local_OnImageLoaded(ImageLoadedEventArgs e)
+    private void Local_ImageLoaded(ImageLoadedEventArgs e)
     {
         if (InvokeRequired)
         {
-            Invoke(Local_OnImageLoaded, e);
+            Invoke(Local_ImageLoaded, e);
             return;
         }
 
@@ -903,12 +921,9 @@ public partial class FrmMain : ModernForm
             Local.IsImageError = true;
             Local.ImageModifiedPath = "";
 
-            var currentFile = Local.Images.GetFilePath(e.Index);
-            if (!string.IsNullOrEmpty(currentFile) && !File.Exists(currentFile))
-            {
-                Local.Images.Unload(e.Index);
-            }
+            IG_Unload();
 
+            var emoji = BHelper.IsOS(WindowsOS.Win11OrLater) ? "🥲" : "🙄";
             var archInfo = Environment.Is64BitProcess ? "64-bit" : "32-bit";
             var appVersion = App.Version + $" ({archInfo}, .NET {Environment.Version})";
 
@@ -918,9 +933,9 @@ public partial class FrmMain : ModernForm
                 $"\r\nℹ️ Error details:" +
                 $"\r\n";
 
-            PicMain.ShowMessage(debugInfo + 
+            PicMain.ShowMessage(debugInfo +
                 e.Error.Source + ": " + e.Error.Message,
-                Config.Language[$"{Name}.{nameof(PicMain)}._ErrorText"] + " 🥲");
+                Config.Language[$"{Name}.{nameof(PicMain)}._ErrorText"] + $" {emoji}");
         }
 
         else if (!(e.Data?.ImgData.IsImageNull ?? true))
@@ -939,10 +954,16 @@ public partial class FrmMain : ModernForm
                     || Local.Metadata.Height > 8000;
                 enableFadingTrainsition = !_isShowingImagePreview && !isImageBigForFading;
             }
-            
+
 
             // set the main image
-            PicMain.SetImage(e.Data.ImgData, e.ResetZoom, enableFadingTrainsition);
+            PicMain.SetImage(e.Data.ImgData, Config.EnableWindowFit ? false : e.ResetZoom, enableFadingTrainsition);
+
+            // update window fit
+            if (e.ResetZoom && Config.EnableWindowFit)
+            {
+                FitWindowToImage();
+            }
 
             PicMain.ClearMessage();
         }
@@ -955,23 +976,23 @@ public partial class FrmMain : ModernForm
 
 
         _isShowingImagePreview = false;
-        UpdateImageInfo(ImageInfoUpdateTypes.Dimension | ImageInfoUpdateTypes.FramesCount);
+        LoadImageInfo(ImageInfoUpdateTypes.Dimension | ImageInfoUpdateTypes.FramesCount);
     }
 
-    private void Local_OnImageListLoaded(ImageListLoadedEventArgs e)
+    private void Local_ImageListLoaded(ImageListLoadedEventArgs e)
     {
         if (!string.IsNullOrEmpty(e.FilePath))
         {
             UpdateCurrentIndex(e.FilePath);
         }
 
-        UpdateImageInfo(ImageInfoUpdateTypes.ListCount);
+        LoadImageInfo(ImageInfoUpdateTypes.ListCount);
 
         // Load thumnbnail
         _ = BHelper.RunAsThread(LoadThumbnails);
     }
 
-    private void Local_OnFirstImageReached()
+    private void Local_FirstImageReached()
     {
         if (!Config.EnableLoopBackNavigation)
         {
@@ -980,12 +1001,39 @@ public partial class FrmMain : ModernForm
         }
     }
 
-    private void Local_OnLastImageReached()
+    private void Local_LastImageReached()
     {
         if (!Config.EnableLoopBackNavigation)
         {
             PicMain.ShowMessage(Config.Language[$"{Name}._ReachedLastLast"],
                 Config.InAppMessageDuration);
+        }
+    }
+
+    private void ImageTransform_Changed(object? sender, EventArgs e)
+    {
+        const string TOOLBAR_BUTTON_SAVE_TRANSFORMATION = "Btn_SaveImageTransformation";
+        var btnItem = Toolbar.GetItem(TOOLBAR_BUTTON_SAVE_TRANSFORMATION);
+
+        // has changes, show Save button
+        if (Local.ImageTransform.HasChanges && btnItem == null)
+        {
+            Toolbar.AddItem(new()
+            {
+                Id = TOOLBAR_BUTTON_SAVE_TRANSFORMATION,
+                Image = nameof(Config.Theme.ToolbarIcons.SaveAs),
+                OnClick = new(nameof(MnuSave)),
+                Alignment = ToolStripItemAlignment.Right,
+                Text = MnuSave.Text,
+                DisplayStyle = ToolStripItemDisplayStyle.ImageAndText,
+            }, 1);
+
+            Toolbar.UpdateTheme();
+        }
+        // no change, hide button
+        else if (!Local.ImageTransform.HasChanges && btnItem != null)
+        {
+            Toolbar.Items.RemoveByKey(TOOLBAR_BUTTON_SAVE_TRANSFORMATION);
         }
     }
 
@@ -995,7 +1043,6 @@ public partial class FrmMain : ModernForm
     /// <summary>
     /// Show image preview using the thumbnail
     /// </summary>
-    [SuppressMessage("IDisposableAnalyzers.Correctness", "IDISP001:Dispose created", Justification = "<Pending>")]
     public void ShowImagePreview(string filePath, CancellationToken token = default)
     {
         if (InvokeRequired)
@@ -1055,7 +1102,7 @@ public partial class FrmMain : ModernForm
                 }
                 else
                 {
-                    var zoomFactor = PicMain.CalculateZoomFactor(Config.ZoomMode, Local.Metadata.Width, Local.Metadata.Height);
+                    var zoomFactor = PicMain.CalculateZoomFactor(Config.ZoomMode, Local.Metadata.Width, Local.Metadata.Height, PicMain.Width, PicMain.Height);
 
                     previewSize = new((int)(Local.Metadata.Width * zoomFactor), (int)(Local.Metadata.Height * zoomFactor));
                 }
@@ -1092,14 +1139,14 @@ public partial class FrmMain : ModernForm
 
 
     /// <summary>
-    /// Update image info in status bar
+    /// Loads image info in status bar
     /// </summary>
-    public void UpdateImageInfo(ImageInfoUpdateTypes types = ImageInfoUpdateTypes.All,
+    public void LoadImageInfo(ImageInfoUpdateTypes types = ImageInfoUpdateTypes.All,
         string? filename = null)
     {
         if (InvokeRequired)
         {
-            Invoke(UpdateImageInfo, types, filename);
+            Invoke(LoadImageInfo, types, filename);
             return;
         }
 
@@ -1323,6 +1370,32 @@ public partial class FrmMain : ModernForm
                 ImageInfo.DateTimeAuto = dtStr;
             }
 
+            // ColorSpace
+            if (updateAll || types.HasFlag(ImageInfoUpdateTypes.ColorSpace))
+            {
+                if (Config.InfoItems.Contains(nameof(ImageInfo.ColorSpace))
+                    && Local.Metadata != null
+                    && !string.IsNullOrEmpty(Local.Metadata.ColorSpace))
+                {
+                    var colorProfile = !string.IsNullOrEmpty(Local.Metadata.ColorProfile)
+                        ? Local.Metadata.ColorProfile
+                        : "-";
+
+                    if (Local.Metadata.ColorSpace.Equals(colorProfile, StringComparison.InvariantCultureIgnoreCase))
+                    {
+                        ImageInfo.ColorSpace = Local.Metadata.ColorSpace;
+                    }
+                    else
+                    {
+                        ImageInfo.ColorSpace = $"{Local.Metadata.ColorSpace}/{colorProfile}";
+                    }
+                }
+                else
+                {
+                    ImageInfo.ColorSpace = string.Empty;
+                }
+            }
+
         }
 
 
@@ -1437,7 +1510,7 @@ public partial class FrmMain : ModernForm
         else
         {
             var currentFilePath = Local.Images.GetFilePath(Local.CurrentIndex);
-            var procArgs = $"{ac.Argument}".Replace(Constants.FILE_MACRO, currentFilePath);
+            var procArgs = $"{ac.Argument}".Replace(Constants.FILE_MACRO, $"\"{currentFilePath}\"");
 
             // run external command line
             using var proc = new Process
@@ -1468,7 +1541,7 @@ public partial class FrmMain : ModernForm
         // show error if any
         else
         {
-            Config.ShowError(error.ToString(), Config.Language["_._Error"], error.Message);
+            Config.ShowError(this, error.ToString(), Config.Language["_._Error"], error.Message);
         }
     }
 
@@ -1478,9 +1551,8 @@ public partial class FrmMain : ModernForm
     /// </summary>
     public void ExecuteMouseAction(MouseClickEvent e)
     {
-        if (Config.MouseClickActions.ContainsKey(e))
+        if (Config.MouseClickActions.TryGetValue(e, out var toggleAction))
         {
-            var toggleAction = Config.MouseClickActions[e];
             var isToggled = ToggleAction.IsToggled(toggleAction.Id);
             var action = isToggled
                 ? toggleAction.ToggleOff
@@ -1543,7 +1615,7 @@ public partial class FrmMain : ModernForm
         try
         {
             // Alert user if there is a new version
-            if (Config.IsNewVersionAvailable)
+            if (Config.ShowNewVersionIndicator)
             {
                 MnuCheckForUpdate.Text = MnuCheckForUpdate.Text = Config.Language[$"{Name}.{nameof(MnuCheckForUpdate)}._NewVersion"];
                 MnuHelp.BackColor = MnuCheckForUpdate.BackColor = Color.FromArgb(35, 255, 165, 2);
@@ -1555,8 +1627,7 @@ public partial class FrmMain : ModernForm
             }
 
             MnuViewChannels.Enabled = true;
-            MnuExtractFrames.Enabled =
-                MnuStartStopAnimating.Enabled =
+            MnuToggleImageAnimation.Enabled =
                 MnuViewPreviousFrame.Enabled =
                 MnuViewNextFrame.Enabled =
                 MnuViewFirstFrame.Enabled =
@@ -1568,15 +1639,14 @@ public partial class FrmMain : ModernForm
             {
                 MnuViewChannels.Enabled = false;
 
-                MnuExtractFrames.Enabled =
-                    MnuStartStopAnimating.Enabled =
+                MnuToggleImageAnimation.Enabled =
                     MnuViewPreviousFrame.Enabled =
                     MnuViewNextFrame.Enabled =
                     MnuViewFirstFrame.Enabled =
                     MnuViewLastFrame.Enabled = true;
             }
 
-            MnuExtractFrames.Text = string.Format(Config.Language[$"{Name}.{nameof(MnuExtractFrames)}"], Local.Metadata?.FramesCount);
+            MnuExportFrames.Text = string.Format(Config.Language[$"{Name}.{nameof(MnuExportFrames)}"], Local.Metadata?.FramesCount);
 
             // check if igcmdWin10.exe exists!
             if (!BHelper.IsOS(WindowsOS.Win10OrLater)
@@ -1590,18 +1660,8 @@ public partial class FrmMain : ModernForm
                 MnuOpenWith.Enabled = false;
             }
 
-            //// add hotkey to Exit menu
-            //if (false) // Config.IsContinueRunningBackground)
-            //{
-            //    MnuExit.ShortcutKeyDisplayString = "Shift+ESC";
-            //}
-            //else
-            //{
-            //    MnuExit.ShortcutKeyDisplayString = Config.EnablePressESCToQuit ? "ESC" : "Alt+F4";
-            //}
-
-            //// Get EditApp for editing
-            //UpdateEditAppInfoForMenu();
+            // Get EditApp for editing
+            UpdateEditAppInfoForMenu();
         }
         catch { }
 
@@ -1616,26 +1676,21 @@ public partial class FrmMain : ModernForm
         var hasClipboardImage = Local.ClipboardImage != null;
         var imageNotFound = !File.Exists(Local.Images.GetFilePath(Local.CurrentIndex));
 
-        //if (Config.IsSlideshow && !imageNotFound)
-        //{
-        //    MnuContext.Items.Add(MenuUtils.Clone(MnuPauseResumeSlideshow));
-        //    MnuContext.Items.Add(MenuUtils.Clone(MnuExitSlideshow));
-        //    MnuContext.Items.Add(new ToolStripSeparator());
-        //}
 
         // toolbar menu
         MnuContext.Items.Add(MenuUtils.Clone(MnuToggleToolbar));
         MnuContext.Items.Add(MenuUtils.Clone(MnuToggleTopMost));
 
-        if (!hasClipboardImage)
-        {
-            MnuContext.Items.Add(new ToolStripSeparator());
-            MnuContext.Items.Add(MenuUtils.Clone(MnuLoadingOrders));
-        }
 
         // Get Edit App info
         if (!imageNotFound)
         {
+            if (!hasClipboardImage)
+            {
+                MnuContext.Items.Add(new ToolStripSeparator());
+                MnuContext.Items.Add(MenuUtils.Clone(MnuLoadingOrders));
+            }
+
             if (!Local.IsImageError
                 && !hasClipboardImage
                 && Local.Metadata?.FramesCount <= 1)
@@ -1649,27 +1704,9 @@ public partial class FrmMain : ModernForm
                 MnuContext.Items.Add(MenuUtils.Clone(MnuOpenWith));
             }
 
-            //UpdateEditAppInfoForMenu();
-            //MnuContext.Items.Add(MenuUtils.Clone(MnuEdit));
-
-            //#region Check if image can animate (GIF)
-            //try
-            //{
-            //    if (!Local.IsImageError && Local.Metadata?.FramesCount > 1)
-            //    {
-            //        var mnu1 = MenuUtils.Clone(MnuExtractFrames);
-            //        mnu1.Text = string.Format(Config.Language[$"{Name}.{nameof(MnuExtractFrames)}"], Local.Metadata?.FramesCount);
-            //        mnu1.Enabled = true;
-
-            //        var mnu2 = MenuUtils.Clone(MnuStartStopAnimating);
-            //        mnu2.Enabled = true;
-
-            //        MnuContext.Items.Add(mnu1);
-            //        MnuContext.Items.Add(mnu2);
-            //    }
-            //}
-            //catch { }
-            //#endregion
+            // menu Edit
+            UpdateEditAppInfoForMenu();
+            MnuContext.Items.Add(MenuUtils.Clone(MnuEdit));
         }
 
 
@@ -1694,8 +1731,8 @@ public partial class FrmMain : ModernForm
 
         if (!imageNotFound && Local.ClipboardImage == null)
         {
-            MnuContext.Items.Add(MenuUtils.Clone(MnuCopy));
-            MnuContext.Items.Add(MenuUtils.Clone(MnuCut));
+            MnuContext.Items.Add(MenuUtils.Clone(MnuCopyFile));
+            MnuContext.Items.Add(MenuUtils.Clone(MnuCutFile));
         }
 
         if (!imageNotFound && Local.ClipboardImage == null)
@@ -1750,7 +1787,7 @@ public partial class FrmMain : ModernForm
 
     private void MnuEdit_Click(object sender, EventArgs e)
     {
-        // TODO
+        IG_OpenEditApp();
     }
 
     private void MnuPrint_Click(object sender, EventArgs e)
@@ -1968,12 +2005,12 @@ public partial class FrmMain : ModernForm
 
     private void MnuRotateLeft_Click(object sender, EventArgs e)
     {
-
+        IG_Rotate(RotateOption.Left);
     }
 
     private void MnuRotateRight_Click(object sender, EventArgs e)
     {
-
+        IG_Rotate(RotateOption.Right);
     }
 
     private void MnuFlipHorizontal_Click(object sender, EventArgs e)
@@ -2001,14 +2038,14 @@ public partial class FrmMain : ModernForm
         IG_Delete(false);
     }
 
-    private void MnuStartStopAnimating_Click(object sender, EventArgs e)
+    private void MnuToggleImageAnimation_Click(object sender, EventArgs e)
     {
-
+        IG_ToggleImageAnimation();
     }
 
-    private void MnuExtractFrames_Click(object sender, EventArgs e)
+    private void MnuExportFrames_Click(object sender, EventArgs e)
     {
-
+        IG_ExportImageFrames();
     }
 
     private void MnuSetDesktopBackground_Click(object sender, EventArgs e)
@@ -2039,12 +2076,12 @@ public partial class FrmMain : ModernForm
     #region Window modes menu
     private void MnuWindowFit_Click(object sender, EventArgs e)
     {
-
+        IG_ToggleWindowFit();
     }
 
     private void MnuFrameless_Click(object sender, EventArgs e)
     {
-
+        IG_ToggleFrameless();
     }
 
     private void MnuFullScreen_Click(object sender, EventArgs e)
@@ -2082,12 +2119,12 @@ public partial class FrmMain : ModernForm
         IG_CopyImageData();
     }
 
-    private void MnuCopy_Click(object sender, EventArgs e)
+    private void MnuCopyFile_Click(object sender, EventArgs e)
     {
         IG_CopyFiles();
     }
 
-    private void MnuCut_Click(object sender, EventArgs e)
+    private void MnuCutFile_Click(object sender, EventArgs e)
     {
         IG_CutFiles();
     }
@@ -2111,7 +2148,7 @@ public partial class FrmMain : ModernForm
 
     private void MnuColorPicker_Click(object sender, EventArgs e)
     {
-
+        IG_ToggleColorPicker();
     }
 
     private void MnuCropTool_Click(object sender, EventArgs e)
@@ -2123,12 +2160,6 @@ public partial class FrmMain : ModernForm
     {
 
     }
-
-    private void MnuExifTool_Click(object sender, EventArgs e)
-    {
-
-    }
-
 
 
     #endregion // Menu Tools
@@ -2195,5 +2226,5 @@ public partial class FrmMain : ModernForm
 
     #endregion // Main Menu component
 
-    
+
 }

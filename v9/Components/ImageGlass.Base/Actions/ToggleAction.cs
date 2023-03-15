@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -32,7 +32,7 @@ public class ToggleAction
     /// </summary>
     private static readonly Dictionary<Guid, bool> _manager = new();
 
-    
+
     /// <summary>
     /// Gets the id of the action for toggling.
     /// </summary>
@@ -70,11 +70,11 @@ public class ToggleAction
         {
             return isToggled;
         }
-        
+
         return false;
     }
 
-    
+
     /// <summary>
     /// Sets the toggling value of the given action
     /// </summary>
@@ -89,6 +89,6 @@ public class ToggleAction
             _manager.Add(actionId, isToggled);
         }
     }
-    
+
 }
 

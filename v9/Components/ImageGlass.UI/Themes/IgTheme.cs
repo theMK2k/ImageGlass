@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -19,9 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 using ImageGlass.Base;
 using ImageGlass.Base.Photoing.Codecs;
 using ImageGlass.Base.WinApi;
-using ImageMagick;
-using System.Drawing.Drawing2D;
-using System.Drawing.Text;
 using WicNet;
 
 namespace ImageGlass.UI;
@@ -64,7 +61,7 @@ public class IgTheme : IDisposable
 
     private int _iconHeight = Constants.TOOLBAR_ICON_HEIGHT;
 
-    
+
     /// <summary>
     /// Filename of theme configuration since v9.0.
     /// </summary>
@@ -248,11 +245,11 @@ public class IgTheme : IDisposable
                 // property is WicBitmapSource
                 if (prop?.PropertyType == typeof(WicBitmapSource))
                 {
-                    var data = PhotoCodec.Load(Path.Combine(FolderPath, value), new()
+                    var data = BHelper.RunSync(() => PhotoCodec.LoadAsync(Path.Combine(FolderPath, value), new()
                     {
                         Width = ToolbarActualIconHeight * 2,
                         Height = ToolbarActualIconHeight * 2,
-                    });
+                    }));
 
                     prop.SetValue(Settings, data.Image);
                     continue;

@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -26,7 +26,7 @@ namespace ImageGlass.Base;
 public enum ImageInfoUpdateTypes
 {
     None = 0,
-    
+
     All = 1 << 1,
     AppName = 1 << 2,
     Name = 1 << 3,
@@ -43,4 +43,5 @@ public enum ImageInfoUpdateTypes
     ExifDateTimeOriginal = 1 << 13,
 
     ExifRating = 1 << 14,
+    ColorSpace = 1 << 15,
 }

@@ -17,15 +17,15 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 using ImageGlass.Base;
-using ImageGlass.Base.NamedPipes;
 using ImageGlass.Base.PhotoBox;
 using ImageGlass.Base.Photoing.Codecs;
 using ImageGlass.Base.WinApi;
 using ImageGlass.Library.WinAPI;
 using ImageGlass.Settings;
-using ImageGlass.UI;
+using ImageGlass.Tools;
 using ImageGlass.Views;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Pipes;
 using WicNet;
@@ -109,7 +109,7 @@ public partial class FrmMain
         // cancel the current loading image
         _loadCancelToken?.Cancel();
 
-        if (Local.ClipboardImage !=null)
+        if (Local.ClipboardImage != null)
         {
             LoadClipboardImage(null);
             _ = ViewNextCancellableAsync(0, isSkipCache: true);
@@ -120,6 +120,12 @@ public partial class FrmMain
             PicMain.ClearMessage();
 
             Local.Images.Unload(Local.CurrentIndex);
+
+            Local.RaiseImageUnloadedEvent(new ImageUnloadedEventArgs()
+            {
+                Index = Local.CurrentIndex,
+                FilePath = Local.Images.GetFilePath(Local.CurrentIndex),
+            });
         }
     }
 
@@ -150,7 +156,7 @@ public partial class FrmMain
         if (Local.Images.Length == 0) return;
 
         var oldIndex = Local.CurrentIndex + 1;
-        using var frm = new Popup(Config.Theme, Config.Language)
+        using var frm = new Popup()
         {
             Title = Config.Language[$"{Name}.{nameof(MnuGoTo)}"],
             Value = oldIndex.ToString(),
@@ -410,7 +416,7 @@ public partial class FrmMain
         if (PicMain.Source == ImageSource.Null) return;
 
         var oldZoom = PicMain.ZoomFactor * 100f;
-        using var frm = new Popup(Config.Theme, Config.Language)
+        using var frm = new Popup()
         {
             Title = Config.Language[$"{Name}.{nameof(MnuCustomZoom)}"],
             Value = oldZoom.ToString(),
@@ -509,14 +515,14 @@ public partial class FrmMain
         visible ??= !Config.ShowThumbnails;
         Config.ShowThumbnails = visible.Value;
 
-        Gallery.ScrollBars = Config.ShowThumbnailScrollbars;
+        Gallery.ScrollBars = Config.ShowThumbnailScrollbars || Gallery.View == ImageGlass.Gallery.View.Thumbnails;
         Gallery.ShowItemText = Config.ShowThumbnailFilename;
 
         // update gallery size
         UpdateGallerySize();
 
         // toggle gallery
-        Sp1.Panel2Collapsed = !Config.ShowThumbnails;
+        Gallery.Visible = Config.ShowThumbnails;
 
         // update menu item state
         MnuToggleThumbnails.Checked = Config.ShowThumbnails;
@@ -535,30 +541,39 @@ public partial class FrmMain
     {
         if (!Config.ShowThumbnails) return;
 
-
-        var scrollBarSize = 0;
-        if (Config.ShowThumbnailScrollbars)
+        var scrollBarSize = this.ScaleToDpi(1.5f); // random gap
+        if (Gallery.ScrollBars && Gallery.HScrollBar.Visible)
         {
-            Gallery.HScrollBar.Height = SystemInformation.HorizontalScrollBarHeight / 2;
-            scrollBarSize += Gallery.HScrollBar.Height
-                + this.ScaleToDpi(2); // scrollbar gap
+            Gallery.VScrollBar.Height =
+                Gallery.HScrollBar.Height =
+                    (int)(SystemInformation.HorizontalScrollBarHeight * 0.75f);
+
+            scrollBarSize += Gallery.HScrollBar.Height;
         }
 
         // update thumbnail size
-        Gallery.ThumbnailSize = this.ScaleToDpi(new SizeF(Config.ThumbnailSize, Config.ThumbnailSize)).ToSize();
+        Gallery.ThumbnailSize = this.ScaleToDpi(new Size(Config.ThumbnailSize, Config.ThumbnailSize));
 
-        // Gallery bar
-        Gallery.Height = Gallery.ThumbnailSize.Height
-            + scrollBarSize
-            + (int)(Gallery.Renderer.MeasureItemMargin(Gallery.View).Height * 6.5f);
 
-        try
+        // Thumbnails view
+        if (Gallery.View == ImageGlass.Gallery.View.Thumbnails)
         {
-            Sp1.SplitterDistance = Sp1.Height
-            - Sp1.SplitterWidth
-            - Gallery.Height;
+            var minWidth = Gallery.ThumbnailSize.Width
+                + (int)scrollBarSize
+                + (int)(Gallery.Renderer.MeasureItemMargin(Gallery.View).Width * 6.5f);
+
+            Gallery.Width = Math.Max(minWidth, Config.ThumbnailBarWidth);
+            Config.ThumbnailBarWidth = Gallery.Width;
         }
-        catch { }
+        // HorizontalStrip view
+        else
+        {
+            // Gallery bar
+            Gallery.Height = Gallery.ThumbnailSize.Height
+                + (int)scrollBarSize
+                + (int)(Gallery.Renderer.MeasureItemMargin(Gallery.View).Height * 6.5f);
+        }
+
     }
 
 
@@ -660,13 +675,15 @@ public partial class FrmMain
             AllowCancel = true,
             Caption = $"About",
 
-            Heading = $"{App.AppName} beta 2\r\n" +
+            Heading = $"{App.AppName} beta 4\r\n" +
                 $"A lightweight, versatile image viewer\r\n" +
                 $"\r\n" +
                 $"Version: {appVersion}\r\n" +
                 $".NET Runtime: {Environment.Version.ToString()}",
 
-            Text = $"Special thanks to:\r\n" +
+            Text = $"Author: Dương Diệu Pháp\r\n" +
+                    $"\r\n" +
+                    $"Special thanks to:\r\n" +
                     $"◾ Logo designer: Nguyễn Quốc Tuấn.\r\n" +
                     $"◾ Collaborator: Kevin Routley (https://github.com/fire-eggs).\r\n" +
                     $"\r\n" +
@@ -699,12 +716,12 @@ public partial class FrmMain
 
                     "◾ D2Phap.DXControl\r\n" +
                     "    Distributed under the terms of the MIT license.\r\n" +
-                    "    Copyright © 2022 Dương Diệu Pháp. All rights reserved.\r\n" +
+                    "    Copyright © 2022-2023 Dương Diệu Pháp. All rights reserved.\r\n" +
                     "\r\n" +
 
                     "◾ Magick.NET\r\n" +
                     "    Distributed under the terms of the MIT license.\r\n" +
-                    "    Copyright © 2013-2022 Dirk Lemstra.\r\n" +
+                    "    Copyright © 2013-2023 Dirk Lemstra.\r\n" +
                     "\r\n" +
 
                     "◾ ExplorerSortOrder\r\n" +
@@ -775,7 +792,7 @@ public partial class FrmMain
         var ext = Path.GetExtension(currentFile).ToUpperInvariant();
         var langPath = $"{Name}.{nameof(MnuPrint)}";
 
-        PicMain.ShowMessage(Config.Language[$"{langPath}._CreatingFile"], "", delayMs: 500);
+        PicMain.ShowMessage(Config.Language[$"_._CreatingFile"], "", delayMs: 500);
 
 
         // print clipboard image
@@ -805,7 +822,8 @@ public partial class FrmMain
 
         if (string.IsNullOrEmpty(fileToPrint))
         {
-            _ = Config.ShowError(Config.Language[$"{langPath}._CreatingFileError"],
+            _ = Config.ShowError(this,
+                Config.Language[$"_._CreatingFileError"],
                 Config.Language[langPath]);
         }
         else
@@ -816,7 +834,8 @@ public partial class FrmMain
             }
             catch (Exception ex)
             {
-                _ = Config.ShowError($"{ex.Source}:\r\n{ex.Message}", "",
+                _ = Config.ShowError(this,
+                    $"{ex.Source}:\r\n{ex.Message}", "",
                     Config.Language[$"{langPath}._Error"]);
             }
         }
@@ -840,7 +859,7 @@ public partial class FrmMain
         // print clipboard image
         if (Local.ClipboardImage != null)
         {
-            PicMain.ShowMessage(Config.Language[$"{langPath}._CreatingFile"], "", delayMs: 500);
+            PicMain.ShowMessage(Config.Language[$"_._CreatingFile"], "", delayMs: 500);
 
             // save image to temp file
             filePath = await Local.SaveImageAsTempFileAsync(".png");
@@ -850,7 +869,8 @@ public partial class FrmMain
 
         if (!File.Exists(filePath))
         {
-            _ = Config.ShowError(Config.Language[$"{langPath}._CreatingFileError"],
+            _ = Config.ShowError(this,
+                Config.Language[$"_._CreatingFileError"],
                 Config.Language[langPath]);
         }
         else
@@ -864,7 +884,8 @@ public partial class FrmMain
                 _ = Config.ShowError(
                     description: Config.Language[$"{langPath}._Error"],
                     title: Config.Language[langPath],
-                    heading: Config.Language["_._Error"]);
+                    heading: Config.Language["_._Error"],
+                    formOwner: this);
             }
         }
     }
@@ -926,7 +947,7 @@ public partial class FrmMain
 
 
         PicMain.ShowMessage(
-            string.Format(Config.Language[$"{Name}.{nameof(MnuCopy)}._Success"], Config.EnableCopyMultipleFiles ? Local.StringClipboard.Count : 1),
+            string.Format(Config.Language[$"{Name}.{nameof(MnuCopyFile)}._Success"], Config.EnableCopyMultipleFiles ? Local.StringClipboard.Count : 1),
             Config.InAppMessageDuration);
     }
 
@@ -993,7 +1014,7 @@ public partial class FrmMain
 
 
         PicMain.ShowMessage(
-            string.Format(Config.Language[$"{Name}.{nameof(MnuCut)}._Success"], Config.EnableCutMultipleFiles ? Local.StringClipboard.Count : 1),
+            string.Format(Config.Language[$"{Name}.{nameof(MnuCutFile)}._Success"], Config.EnableCutMultipleFiles ? Local.StringClipboard.Count : 1),
             Config.InAppMessageDuration);
     }
 
@@ -1135,10 +1156,12 @@ public partial class FrmMain
         }, enableFading: Config.EnableImageTransition);
         PicMain.ClearMessage();
 
+        Local.ImageTransform.Clear();
+
         // reset zoom mode
         IG_SetZoomMode(Config.ZoomMode.ToString());
 
-        UpdateImageInfo(ImageInfoUpdateTypes.All);
+        LoadImageInfo(ImageInfoUpdateTypes.All);
     }
 
 
@@ -1152,14 +1175,7 @@ public partial class FrmMain
     {
         var filePath = Local.Images.GetFilePath(Local.CurrentIndex);
 
-        try
-        {
-            ExplorerApi.OpenFolderAndSelectItem(filePath);
-        }
-        catch
-        {
-            using var proc = Process.Start("explorer.exe", $"/select,\"{filePath}\"");
-        }
+        BHelper.OpenFilePath(filePath);
     }
 
 
@@ -1329,6 +1345,7 @@ public partial class FrmMain
         Exception? error = null;
 
         PicMain.ShowMessage(destFilePath, Config.Language[$"{langPath}._Saving"]);
+        _fileWatcher.Stop();
 
 
         // save the selection
@@ -1379,9 +1396,12 @@ public partial class FrmMain
         // success
         if (saveSource == ImageSaveSource.SelectedArea)
         {
-            // TODO: remove when FileWatcher ready!
-            // reload to view the updated image
-            IG_Reload();
+            // manually update the change if FileWatcher is not enabled
+            if (!Config.EnableFileWatcher)
+            {
+                // reload to view the updated image
+                IG_Reload();
+            }
 
             // reset selection
             PicMain.ClientSelection = default;
@@ -1391,9 +1411,12 @@ public partial class FrmMain
             // clear the clipboard image
             LoadClipboardImage(null);
 
-            // TODO: remove when FileWatcher ready!
-            // reload to view the updated image
-            IG_Reload();
+            // manually update the change if FileWatcher is not enabled
+            if (!Config.EnableFileWatcher)
+            {
+                // reload to view the updated image
+                IG_Reload();
+            }
         }
 
         PicMain.ShowMessage(destFilePath, Config.Language[$"{langPath}._Success"], Config.InAppMessageDuration);
@@ -1405,6 +1428,15 @@ public partial class FrmMain
             // update cache of the modified item
             Gallery.Items[Local.CurrentIndex].UpdateThumbnail();
             Gallery.Items[Local.CurrentIndex].UpdateDetails(true);
+        }
+
+
+        // reload image
+        IG_Reload();
+        Gallery.Items[Local.CurrentIndex].UpdateThumbnail();
+        if (Config.EnableFileWatcher)
+        {
+            _fileWatcher.Start();
         }
 
 
@@ -1429,19 +1461,22 @@ public partial class FrmMain
                 || destPath.EndsWith(".txt", StringComparison.InvariantCultureIgnoreCase))
             {
                 var srcExt = Path.GetExtension(srcPath);
-                await PhotoCodec.SaveAsBase64Async(wicImg, srcExt, destPath);
+                await PhotoCodec.SaveAsBase64Async(wicImg, srcExt, destPath, Local.ImageTransform);
             }
             // other formats
             else
             {
-                await PhotoCodec.SaveAsync(wicImg, destPath, Config.ImageEditQuality);
+                await PhotoCodec.SaveAsync(wicImg, destPath, Local.ImageTransform, Config.ImageEditQuality);
             }
 
             // Issue #307: option to preserve the modified date/time
-            if (Config.PreserveModifiedDate)
+            if (Config.ShouldPreserveModifiedDate)
             {
                 File.SetLastWriteTime(destPath, lastWriteTime);
             }
+
+            // reset transformations
+            Local.ImageTransform.Clear();
         }
         catch (Exception ex)
         {
@@ -1465,20 +1500,22 @@ public partial class FrmMain
             if (destPath.EndsWith(".b64", StringComparison.InvariantCultureIgnoreCase)
                 || destPath.EndsWith(".txt", StringComparison.InvariantCultureIgnoreCase))
             {
-                await PhotoCodec.SaveAsBase64Async(srcPath, destPath, Local.Images.ReadOptions, Local.CurrentChanges);
-
+                await PhotoCodec.SaveAsBase64Async(srcPath, destPath, Local.Images.ReadOptions, Local.ImageTransform);
             }
             // other formats
             else
             {
-                await PhotoCodec.SaveAsync(srcPath, destPath, Local.Images.ReadOptions, Local.CurrentChanges, Config.ImageEditQuality);
+                await PhotoCodec.SaveAsync(srcPath, destPath, Local.Images.ReadOptions, Local.ImageTransform, Config.ImageEditQuality);
             }
 
             // Issue #307: option to preserve the modified date/time
-            if (Config.PreserveModifiedDate)
+            if (Config.ShouldPreserveModifiedDate)
             {
                 File.SetLastWriteTime(destPath, lastWriteTime);
             }
+
+            // reset transformations
+            Local.ImageTransform.Clear();
         }
         catch (Exception ex)
         {
@@ -1508,7 +1545,7 @@ public partial class FrmMain
 
         if (Local.ClipboardImage != null)
         {
-            PicMain.ShowMessage(Config.Language[$"{langPath}._CreatingFile"], "", delayMs: 500);
+            PicMain.ShowMessage(Config.Language[$"_._CreatingFile"], "", delayMs: 500);
 
             filePath = await Local.SaveImageAsTempFileAsync(".png");
         }
@@ -1522,7 +1559,8 @@ public partial class FrmMain
 
         if (!File.Exists(filePath))
         {
-            _ = Config.ShowError(Config.Language[$"{langPath}._CreatingFileError"],
+            _ = Config.ShowError(this,
+                Config.Language[$"_._CreatingFileError"],
                 Config.Language[langPath]);
         }
         else
@@ -1542,6 +1580,187 @@ public partial class FrmMain
             }
             catch { }
         }
+    }
+
+
+    /// <summary>
+    /// Open app for edit action.
+    /// </summary>
+    public void IG_OpenEditApp()
+    {
+        _ = OpenEditAppAsync();
+    }
+
+    public async Task OpenEditAppAsync()
+    {
+        var langPath = $"{Name}.{nameof(MnuEdit)}";
+
+        // get file path to edit
+        string? filePath;
+        if (Local.ClipboardImage != null)
+        {
+            PicMain.ShowMessage(Config.Language[$"_._CreatingFile"], "", delayMs: 500);
+            filePath = await Local.SaveImageAsTempFileAsync(".png");
+        }
+        else
+        {
+            filePath = Local.Images.GetFilePath(Local.CurrentIndex);
+        }
+        PicMain.ClearMessage();
+
+
+        if (!File.Exists(filePath))
+        {
+            _ = Config.ShowError(this,
+                Config.Language[$"_._CreatingFileError"],
+                Config.Language[langPath]);
+
+            return;
+        }
+
+
+        // get extension
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+
+        // get app from the extension
+        if (Config.EditApps.TryGetValue(ext, out var app) && app != null)
+        {
+            // open configured app for editing
+            using var p = new Process();
+            p.StartInfo.FileName = BHelper.ResolvePath(app.Executable);
+
+            // build the arguments
+            var args = app.Argument.Replace(Constants.FILE_MACRO, $"\"{filePath}\"");
+            p.StartInfo.Arguments = $"{args}";
+
+            // show error dialog
+            p.StartInfo.ErrorDialog = true;
+
+            try
+            {
+                p.Start();
+
+                RunActionAfterEditing();
+            }
+            catch { }
+        }
+        else // Edit by default associated app
+        {
+            EditByDefaultApp(filePath);
+        }
+    }
+
+    /// <summary>
+    /// Runs the <see cref="Config.AfterEditingAction"/> action after done editing.
+    /// </summary>
+    public void RunActionAfterEditing()
+    {
+        if (Config.AfterEditingAction == AfterEditAppAction.Minimize)
+        {
+            foreach (var frm in Application.OpenForms)
+            {
+                (frm as Form).WindowState = FormWindowState.Minimized;
+            }
+        }
+        else if (Config.AfterEditingAction == AfterEditAppAction.Close)
+        {
+            IG_Exit();
+        }
+    }
+
+    /// <summary>
+    /// Edits the viewing image by default app.
+    /// </summary>
+    public void EditByDefaultApp(string filePath)
+    {
+        var langPath = $"{Name}.{nameof(MnuEdit)}";
+
+        // windows 11 sucks the verb 'edit'
+        if (BHelper.IsOS(WindowsOS.Win11OrLater))
+        {
+            var mspaint11 = @"%LocalAppData%\Microsoft\WindowsApps\mspaint.exe";
+            var mspaint11Path = BHelper.ResolvePath(mspaint11);
+
+            if (!File.Exists(mspaint11Path))
+            {
+                _ = Config.ShowInfo(
+                    description: filePath,
+                    title: string.Format(Config.Language[langPath], ""),
+                    heading: Config.Language[$"{langPath}._AppNotFound"],
+                    formOwner: this);
+
+                return;
+            }
+
+            using var p11 = new Process();
+            p11.StartInfo.FileName = mspaint11Path;
+            p11.StartInfo.Arguments = $"\"{filePath}\"";
+            p11.StartInfo.UseShellExecute = true;
+
+            try
+            {
+                p11.Start();
+
+                RunActionAfterEditing();
+            }
+            catch (Exception ex)
+            {
+                _ = Config.ShowError(
+                    description: ex.Message + $"\r\n\r\n{filePath}",
+                    title: string.Format(Config.Language[langPath], "(MS Paint)"),
+                    formOwner: this);
+            }
+
+            return;
+        }
+
+
+        // windows 10 or earlier ------------------------------
+        var win32ErrorMsg = string.Empty;
+
+        using var p10 = new Process();
+        p10.StartInfo.FileName = $"\"{filePath}\"";
+        p10.StartInfo.Verb = "edit";
+
+        // first try: launch the associated app for editing
+        try
+        {
+            p10.Start();
+
+            RunActionAfterEditing();
+        }
+        catch (Win32Exception ex)
+        {
+            // file does not have associated app
+            win32ErrorMsg = ex.Message;
+        }
+        catch { }
+
+        if (string.IsNullOrEmpty(win32ErrorMsg)) return;
+
+
+        // second try: use MS Paint to edit the file
+        using var p = new Process();
+        p.StartInfo.FileName = BHelper.ResolvePath("mspaint.exe");
+        p.StartInfo.Arguments = $"\"{filePath}\"";
+        p.StartInfo.UseShellExecute = true;
+
+
+        try
+        {
+            p.Start();
+
+            RunActionAfterEditing();
+        }
+        catch (Win32Exception)
+        {
+            // show error: file does not have associated app
+            _ = Config.ShowError(
+                description: win32ErrorMsg + $"\r\n\r\n{filePath}",
+                title: string.Format(Config.Language[langPath], ""),
+                formOwner: this);
+        }
+        catch { }
     }
 
 
@@ -1588,7 +1807,7 @@ public partial class FrmMain
         var newName = Path.GetFileNameWithoutExtension(oldFilePath);
         var title = Config.Language[$"{Name}.{nameof(MnuRename)}"];
 
-        using var frm = new Popup(Config.Theme, Config.Language)
+        using var frm = new Popup()
         {
             Title = title,
             Value = newName,
@@ -1624,16 +1843,18 @@ public partial class FrmMain
             }
 
 
-            // TODO: once the realtime watcher implemented, delete this:
-            Local.Images.SetFileName(Local.CurrentIndex, newFilePath);
-            Gallery.Items[Local.CurrentIndex].FileName = newFilePath;
-            Gallery.Items[Local.CurrentIndex].Text = newName;
-            UpdateImageInfo(ImageInfoUpdateTypes.Name | ImageInfoUpdateTypes.Path);
-            //////////////////////////////////////////////////////////////
+            // manually update the change if FileWatcher is not enabled
+            if (!Config.EnableFileWatcher)
+            {
+                Local.Images.SetFileName(Local.CurrentIndex, newFilePath);
+                Gallery.Items[Local.CurrentIndex].FileName = newFilePath;
+                Gallery.Items[Local.CurrentIndex].Text = newName;
+                LoadImageInfo(ImageInfoUpdateTypes.Name | ImageInfoUpdateTypes.Path);
+            }
         }
         catch (Exception ex)
         {
-            Config.ShowError(ex.Message, title);
+            Config.ShowError(this, ex.Message, title);
         }
     }
 
@@ -1687,17 +1908,66 @@ public partial class FrmMain
                 BHelper.DeleteFile(filePath, moveToRecycleBin);
 
 
-                // TODO: once the realtime watcher implemented, delete this:
-                Local.Images.Remove(Local.CurrentIndex);
-                Gallery.Items.RemoveAt(Local.CurrentIndex);
-                _ = ViewNextCancellableAsync(0);
-                //////////////////////////////////////////////////////////////
+                // manually update the change if FileWatcher is not enabled
+                if (!Config.EnableFileWatcher)
+                {
+                    Local.Images.Remove(Local.CurrentIndex);
+                    Gallery.Items.RemoveAt(Local.CurrentIndex);
+                    _ = ViewNextCancellableAsync(0);
+                }
             }
             catch (Exception ex)
             {
-                Config.ShowError(ex.Message, title);
+                Config.ShowError(this, ex.Message, title);
             }
         }
+    }
+
+
+    /// <summary>
+    /// Toggles image animation for the animated format.
+    /// </summary>
+    public void IG_ToggleImageAnimation(bool? enable = null)
+    {
+        enable ??= !PicMain.IsImageAnimating;
+
+        if (enable.Value)
+        {
+            PicMain.StartAnimatingImage();
+        }
+        else
+        {
+            PicMain.StopAnimatingImage();
+        }
+    }
+
+
+    /// <summary>
+    /// Exports image frames.
+    /// </summary>
+    public void IG_ExportImageFrames()
+    {
+        _ = ExportImageFramesAsync();
+    }
+
+    public async Task ExportImageFramesAsync()
+    {
+        // image error
+        if (PicMain.Source == ImageSource.Null) return;
+
+
+        var filePath = Local.Images.GetFilePath(Local.CurrentIndex);
+
+        // clipboard image
+        if (Local.ClipboardImage != null)
+        {
+            // save image to temp file
+            filePath = await Local.SaveImageAsTempFileAsync(".png");
+        }
+
+
+        var args = string.Format($"{IgCommands.EXPORT_FRAMES} \"{filePath}\"");
+        await BHelper.RunIgcmd(args);
     }
 
 
@@ -1712,17 +1982,14 @@ public partial class FrmMain
     public async Task SetDesktopBackgroundAsync()
     {
         // image error
-        if (PicMain.Source == ImageSource.Null)
-        {
-            return;
-        }
+        if (PicMain.Source == ImageSource.Null) return;
 
         var filePath = Local.Images.GetFilePath(Local.CurrentIndex);
         var ext = Path.GetExtension(filePath).ToUpperInvariant();
         var defaultExt = BHelper.IsOS(WindowsOS.Win7) ? ".bmp" : ".jpg";
         var langPath = $"{Name}.{nameof(MnuSetDesktopBackground)}";
 
-        PicMain.ShowMessage(Config.Language[$"{langPath}._CreatingFile"], "", delayMs: 500);
+        PicMain.ShowMessage(Config.Language[$"_._CreatingFile"], "", delayMs: 500);
 
 
         // print clipboard image
@@ -1748,7 +2015,8 @@ public partial class FrmMain
         {
             PicMain.ClearMessage();
 
-            _ = Config.ShowError(Config.Language[$"{langPath}._CreatingFileError"],
+            _ = Config.ShowError(this,
+                Config.Language[$"_._CreatingFileError"],
                 Config.Language[langPath]);
         }
         else
@@ -1770,7 +2038,8 @@ public partial class FrmMain
                 _ = Config.ShowError(
                     description: Config.Language[$"{langPath}._Error"],
                     title: Config.Language[langPath],
-                    heading: Config.Language["_._Error"]);
+                    heading: Config.Language["_._Error"],
+                    formOwner: this);
             }
         }
     }
@@ -1796,7 +2065,7 @@ public partial class FrmMain
         var ext = Path.GetExtension(filePath).ToUpperInvariant();
         var langPath = $"{Name}.{nameof(MnuSetLockScreen)}";
 
-        PicMain.ShowMessage(Config.Language[$"{langPath}._CreatingFile"], "", delayMs: 500);
+        PicMain.ShowMessage(Config.Language[$"_._CreatingFile"], "", delayMs: 500);
 
 
         // print clipboard image
@@ -1816,7 +2085,8 @@ public partial class FrmMain
         {
             PicMain.ClearMessage();
 
-            _ = Config.ShowError(Config.Language[$"{langPath}._CreatingFileError"],
+            _ = Config.ShowError(this,
+                Config.Language[$"_._CreatingFileError"],
                 Config.Language[langPath]);
         }
         else
@@ -1838,12 +2108,184 @@ public partial class FrmMain
                 _ = Config.ShowError(
                     description: Config.Language[$"{langPath}._Error"],
                     title: Config.Language[langPath],
-                    heading: Config.Language["_._Error"]);
+                    heading: Config.Language["_._Error"] + $"({result})",
+                    formOwner: this);
             }
         }
     }
 
 
+    /// <summary>
+    /// Toggles Window fit.
+    /// </summary>
+    public bool IG_ToggleWindowFit(bool? enable = null, bool showInAppMessage = true)
+    {
+        enable ??= !Config.EnableWindowFit;
+        Config.EnableWindowFit = enable.Value;
+
+        // set Window Fit mode
+        FitWindowToImage();
+
+        // update menu item state
+        MnuWindowFit.Checked = Config.EnableWindowFit;
+
+        // update toolbar items state
+        UpdateToolbarItemsState();
+
+        if (showInAppMessage)
+        {
+            var langPath = $"{Name}.{nameof(MnuWindowFit)}";
+            var message = Config.EnableWindowFit
+                ? Config.Language[$"{langPath}._Enable"]
+                : Config.Language[$"{langPath}._Disable"];
+
+            PicMain.ShowMessage("", message, Config.InAppMessageDuration);
+        }
+
+        return Config.EnableWindowFit;
+    }
+
+    public void FitWindowToImage(bool resetZoomMode = true)
+    {
+        if (!Config.EnableWindowFit || PicMain.Source == ImageSource.Null)
+            return; // Nothing to do
+
+        #region Set minimum size for window
+        var minH = this.ScaleToDpi(100);
+        if (Config.ShowToolbar)
+        {
+            minH += Toolbar.Height;
+        }
+
+        if (Config.ShowThumbnails)
+        {
+            minH += (int)Config.ThumbnailSize;
+        }
+
+        MinimumSize = new()
+        {
+            Width = this.ScaleToDpi(200),
+            Height = minH,
+        };
+        #endregion
+
+
+        WindowState = FormWindowState.Normal;
+
+        // get current screen
+        var workingArea = Screen.FromControl(this).WorkingArea;
+
+        // Check for early exits
+        // This fixes issue https://github.com/d2phap/ImageGlass/issues/1371
+        // If window size already reached max, then can't be expanded more larger
+        if (PicMain.SourceWidth > workingArea.Width &&
+            PicMain.SourceHeight > workingArea.Height &&
+            Width > workingArea.Width &&
+            Height > workingArea.Height)
+        {
+            return;
+        }
+
+
+        // First, adjust our main window to theoretically fit the entire
+        // picture, but not larger than desktop working area.
+        var fullW = Width + PicMain.SourceWidth - PicMain.Width;
+        var fullH = Height + PicMain.SourceHeight - PicMain.Height;
+
+        var maxWidth = Math.Min(fullW, workingArea.Width);
+        var maxHeight = Math.Min(fullH, workingArea.Height);
+
+
+        // plus some gap if window border is resizable
+        if (FormBorderStyle != FormBorderStyle.None && fullW > workingArea.Width)
+        {
+            maxWidth -= SystemInformation.CaptionHeight / 2;
+        }
+        if (FormBorderStyle != FormBorderStyle.None && fullH > workingArea.Height)
+        {
+            maxHeight -= SystemInformation.CaptionHeight / 2;
+        }
+
+        var zoomFactor = PicMain.ZoomFactor;
+        if (resetZoomMode)
+        {
+            // recalculates zoom factor for the new size
+            zoomFactor = PicMain.CalculateZoomFactor(Config.ZoomMode, fullW, fullH, (int)maxWidth, (int)maxHeight);
+        }
+
+        // get image size after zoomed
+        var zoomImgW = (int)(PicMain.SourceWidth * zoomFactor);
+        var zoomImgH = (int)(PicMain.SourceHeight * zoomFactor);
+
+        // Adjust our main window to theoretically fit the entire
+        // picture, but not larger than desktop working area.
+        fullW = Width + zoomImgW - PicMain.Width;
+        fullH = Height + zoomImgH - PicMain.Height;
+
+        maxWidth = Math.Min(fullW, workingArea.Width);
+        maxHeight = Math.Min(fullH, workingArea.Height);
+
+
+        // update the size
+        Size = new SizeF(maxWidth, maxHeight).ToSize();
+        if (resetZoomMode)
+        {
+            PicMain.SetZoomFactor(zoomFactor, false);
+        }
+
+
+        // center window to screen
+        if (Config.CenterWindowFit)
+        {
+            App.CenterFormToScreen(this);
+        }
+    }
+
+
+
+    /// <summary>
+    /// Toggle framless mode
+    /// </summary>
+    public bool IG_ToggleFrameless(bool? enable = null, bool showInAppMessage = true)
+    {
+        enable ??= !Config.EnableFrameless;
+        Config.EnableFrameless = enable.Value;
+
+        // set frameless mode
+        FormBorderStyle = Config.EnableFrameless ? FormBorderStyle.None : FormBorderStyle.Sizable;
+
+        // update menu item state
+        MnuFrameless.Checked = Config.EnableFrameless;
+
+        // update toolbar items state
+        UpdateToolbarItemsState();
+
+        if (showInAppMessage)
+        {
+            var langPath = $"{Name}.{nameof(MnuFrameless)}";
+
+            if (Config.EnableFrameless)
+            {
+                PicMain.ShowMessage(
+                    string.Format(Config.Language[$"{langPath}._EnableDescription"], MnuFrameless.ShortcutKeyDisplayString),
+                    Config.Language[$"{langPath}._Enable"],
+                    Config.InAppMessageDuration);
+            }
+            else
+            {
+                PicMain.ShowMessage("",
+                    Config.Language[$"{langPath}._Disable"],
+                    Config.InAppMessageDuration);
+            }
+        }
+
+        return Config.EnableFrameless;
+    }
+
+
+    /// <summary>
+    /// Toggles full screen mode.
+    /// </summary>
     public bool IG_ToggleFullScreen(bool? enable = null, bool showInAppMessage = true)
     {
         enable ??= !Config.EnableFullScreen;
@@ -1861,13 +2303,23 @@ public partial class FrmMain
         // update toolbar items state
         UpdateToolbarItemsState();
 
-        if (showInAppMessage && Config.EnableFullScreen)
+        if (showInAppMessage)
         {
             var langPath = $"{Name}.{nameof(MnuFullScreen)}";
-            PicMain.ShowMessage(
-                string.Format(Config.Language[$"{langPath}._EnableDescription"], MnuFullScreen.ShortcutKeyDisplayString),
-                Config.Language[$"{langPath}._Enable"],
-                Config.InAppMessageDuration);
+
+            if (Config.EnableFullScreen)
+            {
+                PicMain.ShowMessage(
+                    string.Format(Config.Language[$"{langPath}._EnableDescription"], MnuFullScreen.ShortcutKeyDisplayString),
+                    Config.Language[$"{langPath}._Enable"],
+                    Config.InAppMessageDuration);
+            }
+            else
+            {
+                PicMain.ShowMessage("",
+                    Config.Language[$"{langPath}._Disable"],
+                    Config.InAppMessageDuration);
+            }
         }
 
         return Config.EnableFullScreen;
@@ -1916,13 +2368,13 @@ public partial class FrmMain
                 IG_ToggleGallery(false);
             }
 
-            // disable background transparency
-            Toolbar.BackColor = Config.Theme.Colors.ToolbarBgColor.NoAlpha();
-            PicMain.BackColor = Config.BackgroundColor.NoAlpha();
-            Gallery.BackColor =
-                Sp1.SplitterBackColor =
-                Sp2.SplitterBackColor = Config.Theme.Colors.ThumbnailBarBgColor.NoAlpha();
-            WindowApi.SetWindowFrame(Handle, new Padding(0));
+            //// disable background transparency
+            //Toolbar.BackColor = Config.Theme.Colors.ToolbarBgColor.NoAlpha();
+            //PicMain.BackColor = Config.BackgroundColor.NoAlpha();
+            //Gallery.BackColor =
+            //    Sp1.SplitterBackColor =
+            //    Sp2.SplitterBackColor = Config.Theme.Colors.ThumbnailBarBgColor.NoAlpha();
+            //WindowApi.SetWindowFrame(Handle, new Padding(0));
 
             ResumeLayout(false);
             Visible = true;
@@ -1948,13 +2400,13 @@ public partial class FrmMain
                 IG_ToggleGallery(true);
             }
 
-            // re-enable background transparency
-            Toolbar.BackColor = Config.Theme.Colors.ToolbarBgColor;
-            PicMain.BackColor = Config.BackgroundColor;
-            Gallery.BackColor =
-                Sp1.SplitterBackColor =
-                Sp2.SplitterBackColor = Config.Theme.Colors.ThumbnailBarBgColor;
-            WindowApi.SetWindowFrame(Handle, BackdropMargin);
+            //// re-enable background transparency
+            //Toolbar.BackColor = Config.Theme.Colors.ToolbarBgColor;
+            //PicMain.BackColor = Config.BackgroundColor;
+            //Gallery.BackColor =
+            //    Sp1.SplitterBackColor =
+            //    Sp2.SplitterBackColor = Config.Theme.Colors.ThumbnailBarBgColor;
+            //WindowApi.SetWindowFrame(Handle, BackdropMargin);
 
             ResumeLayout(false);
 
@@ -2046,7 +2498,7 @@ public partial class FrmMain
 
 
         var fileListJson = BHelper.ToJson(Local.Images.FileNames);
-        await slideshowServer.SendAsync($"{SlideshowPipeCommands.SET_IMAGE_LIST}={fileListJson}");
+        await slideshowServer.SendAsync(SlideshowPipeCommands.SET_IMAGE_LIST, fileListJson);
 
 
         // hide FrmMain
@@ -2074,6 +2526,7 @@ public partial class FrmMain
         _cleanSlideshowServerCancelToken = new();
         _ = CleanSlideshowServerListAsync(_cleanSlideshowServerCancelToken.Token);
     }
+
 
     public async Task CleanSlideshowServerListAsync(CancellationToken token = default)
     {
@@ -2149,7 +2602,7 @@ public partial class FrmMain
     {
         foreach (var server in Local.SlideshowPipeServers)
         {
-            _ = server?.SendAsync(Constants.SLIDESHOW_PIPE_CMD_TERMINATE);
+            _ = server?.SendAsync(ToolServerMsgs.TOOL_TERMINATE);
         }
     }
 
@@ -2210,67 +2663,58 @@ public partial class FrmMain
     /// <param name="options"></param>
     public void IG_FlipImage(FlipOptions options)
     {
-        _ = FlipImageAsync(options);
-    }
+        if (PicMain.Source == ImageSource.Null || Local.IsBusy) return;
 
-    public async Task FlipImageAsync(FlipOptions options)
-    {
-        if (PicMain.Source == ImageSource.Null || options == FlipOptions.None) return;
-
-        if (Local.ClipboardImage != null)
+        // update flip changes
+        if (PicMain.FlipImage(options))
         {
-            PhotoCodec.ApplyIgImgChanges(Local.ClipboardImage, new()
-            {
-                Flips = options,
-            });
-
-            PicMain.SetImage(new()
-            {
-                Image = Local.ClipboardImage,
-                FrameCount = 1,
-                HasAlpha = true,
-            }, enableFading: Config.EnableImageTransition);
-
-            return;
-        }
-
-
-        var img = await Local.Images.GetAsync(Local.CurrentIndex);
-        if (img?.ImgData?.Image != null)
-        {
-            // update flip changes
             if (options.HasFlag(FlipOptions.Horizontal))
             {
-                if (Local.CurrentChanges.Flips.HasFlag(FlipOptions.Horizontal))
+                if (Local.ImageTransform.Flips.HasFlag(FlipOptions.Horizontal))
                 {
-                    Local.CurrentChanges.Flips ^= FlipOptions.Horizontal;
+                    Local.ImageTransform.Flips ^= FlipOptions.Horizontal;
                 }
                 else
                 {
-                    Local.CurrentChanges.Flips |= FlipOptions.Horizontal;
+                    Local.ImageTransform.Flips |= FlipOptions.Horizontal;
                 }
             }
 
             if (options.HasFlag(FlipOptions.Vertical))
             {
-                if (Local.CurrentChanges.Flips.HasFlag(FlipOptions.Vertical))
+                if (Local.ImageTransform.Flips.HasFlag(FlipOptions.Vertical))
                 {
-                    Local.CurrentChanges.Flips ^= FlipOptions.Vertical;
+                    Local.ImageTransform.Flips ^= FlipOptions.Vertical;
                 }
                 else
                 {
-                    Local.CurrentChanges.Flips |= FlipOptions.Vertical;
+                    Local.ImageTransform.Flips |= FlipOptions.Vertical;
                 }
             }
-
-
-            PhotoCodec.ApplyIgImgChanges(img.ImgData.Image, new IgImgChanges()
-            {
-                Flips = options,
-            });
-            PicMain.SetImage(img.ImgData, enableFading: Config.EnableImageTransition);
         }
+    }
 
+
+    /// <summary>
+    /// Rotates the viewing image.
+    /// </summary>
+    public void IG_Rotate(RotateOption option)
+    {
+        if (PicMain.Source == ImageSource.Null || Local.IsBusy) return;
+
+        var degree = option == RotateOption.Left ? -90 : 90;
+
+        // update rotation changes
+        if (PicMain.RotateImage(degree))
+        {
+            var currentRotation = Local.ImageTransform.Rotation + degree;
+            if (Math.Abs(currentRotation) >= 360)
+            {
+                currentRotation = currentRotation % 360;
+            }
+
+            Local.ImageTransform.Rotation = currentRotation;
+        }
     }
 
 
@@ -2317,11 +2761,69 @@ public partial class FrmMain
 
 
     /// <summary>
+    /// Toggle tool window
+    /// </summary>
+    private void ToggleTool(ToolForm form, bool visible)
+    {
+        var toolForm = Local.Tools[form.Name];
+        toolForm.ToolFormClosing -= ToolForm_ToolFormClosing;
+        toolForm.ToolFormClosing += ToolForm_ToolFormClosing;
+
+        if (visible)
+        {
+            // set default location offset on the parent form
+            var padding = DpiApi.Transform(10);
+            var x = padding;
+            var y = PicMain.Top + padding;
+            var loc = PointToScreen(new Point(x, y));
+            loc.Offset(-Left, -Top);
+
+            var totolHeight = 0;
+            foreach (var formName in Local.Tools.Keys)
+            {
+                totolHeight += Local.Tools[formName].Height + padding;
+            }
+
+            var workspaceHeight = Screen.FromControl(this).WorkingArea.Height - padding;
+            var column = totolHeight / workspaceHeight;
+            loc.X += column * Local.Tools[form.Name].Width;
+            loc.Y += totolHeight - Local.Tools[form.Name].Height;
+
+            Local.Tools[form.Name].InitLocation = loc;
+            Local.Tools[form.Name].Show();
+        }
+        else
+        {
+            Local.Tools[form.Name].Close();
+        }
+    }
+
+    private void ToolForm_ToolFormClosing(ToolFormClosingEventArgs e)
+    {
+        if (e.Name == nameof(MnuCropTool))
+        {
+            // update menu item state
+            MnuCropTool.Checked =
+                // set selection mode
+                PicMain.EnableSelection = false;
+        }
+        else if (e.Name == nameof(FrmColorPicker))
+        {
+            MnuColorPicker.Checked = false;
+        }
+
+
+        // update toolbar items state
+        UpdateToolbarItemsState();
+    }
+
+
+    /// <summary>
     /// Toggles crop tool.
     /// </summary>
     public bool IG_ToggleCropTool(bool? visible = null)
     {
-        visible ??= !MnuCropTool.Checked;
+        visible ??= MnuCropTool.Checked;
 
         // update menu item state
         MnuCropTool.Checked =
@@ -2334,39 +2836,45 @@ public partial class FrmMain
         Local.Tools.TryGetValue(nameof(FrmCrop), out var frm);
         if (frm == null)
         {
-            Local.Tools.TryAdd(nameof(FrmCrop), new FrmCrop(this, Config.Theme));
+            Local.Tools.TryAdd(nameof(FrmCrop), new FrmCrop(this));
         }
         else if (frm.IsDisposed)
         {
-            Local.Tools[nameof(FrmCrop)] = new FrmCrop(this, Config.Theme);
+            Local.Tools[nameof(FrmCrop)] = new FrmCrop(this);
         }
 
-        var toolForm = Local.Tools[nameof(FrmCrop)] as FrmCrop;
-        toolForm.ToolFormClosing -= ToolForm_ToolFormClosing;
-        toolForm.ToolFormClosing += ToolForm_ToolFormClosing;
-
-        if (visible.Value)
-        {
-            Local.Tools[nameof(FrmCrop)].Show();
-        }
-        else
-        {
-            Local.Tools[nameof(FrmCrop)].Close();
-        }
+        ToggleTool(Local.Tools[nameof(FrmCrop)], visible.Value);
 
         return visible.Value;
     }
 
 
-    private void ToolForm_ToolFormClosing(ToolFormClosingEventArgs e)
+    /// <summary>
+    /// Toggles Color picker tool.
+    /// </summary>
+    public bool IG_ToggleColorPicker(bool? visible = null)
     {
+        visible ??= MnuColorPicker.Checked;
+
         // update menu item state
-        MnuCropTool.Checked =
-            // set selection mode
-            PicMain.EnableSelection = false;
+        MnuColorPicker.Checked = visible.Value;
 
         // update toolbar items state
         UpdateToolbarItemsState();
+
+        Local.Tools.TryGetValue(nameof(FrmColorPicker), out var frm);
+        if (frm == null)
+        {
+            Local.Tools.TryAdd(nameof(FrmColorPicker), new FrmColorPicker(this));
+        }
+        else if (frm.IsDisposed)
+        {
+            Local.Tools[nameof(FrmColorPicker)] = new FrmColorPicker(this);
+        }
+
+        ToggleTool(Local.Tools[nameof(FrmColorPicker)], visible.Value);
+
+        return visible.Value;
     }
 
 }

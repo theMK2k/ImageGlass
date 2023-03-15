@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -56,19 +56,22 @@ public class IgMetadata
     public bool HasAlpha { get; set; } = false;
     public bool CanAnimate { get; set; } = false;
 
+    public string ColorSpace { get; set; } = string.Empty;
+    public string ColorProfile { get; set; } = string.Empty;
+
 
     // EXIF metadata
     public int ExifRatingPercent { get; set; } = 0;
     public DateTime? ExifDateTimeOriginal { get; set; } = null;
     public DateTime? ExifDateTime { get; set; } = null;
     public string? ExifImageDescription { get; set; } = null;
-    public string? ExifModel { get;set;} = null;
-    public string? ExifArtist { get;set;} = null;
-    public string? ExifCopyright { get;set;} = null;
+    public string? ExifModel { get; set; } = null;
+    public string? ExifArtist { get; set; } = null;
+    public string? ExifCopyright { get; set; } = null;
     public string? ExifSoftware { get; set; } = null;
-    public float? ExifExposureTime { get;set;} = null;
-    public float? ExifFNumber { get;set;} = null;
-    public int? ExifISOSpeed { get;set;} = null;
-    public float? ExifFocalLength { get;set;} = null;
-    
+    public float? ExifExposureTime { get; set; } = null;
+    public float? ExifFNumber { get; set; } = null;
+    public int? ExifISOSpeed { get; set; } = null;
+    public float? ExifFocalLength { get; set; } = null;
+
 }

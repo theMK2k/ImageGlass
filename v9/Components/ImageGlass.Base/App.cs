@@ -18,9 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 using Microsoft.Win32;
 using System.Diagnostics;
-using System.Security;
 using System.Security.Principal;
-using System.Text;
 
 namespace ImageGlass.Base;
 
@@ -30,7 +28,7 @@ public class App
     /// Gets the application executable path
     /// </summary>
     public static string IGExePath => StartUpDir("ImageGlass.exe");
-    
+
 
     /// <summary>
     /// Gets the application name
@@ -67,8 +65,6 @@ public class App
     /// <summary>
     /// Gets the path based on the startup folder of ImageGlass.
     /// </summary>
-    /// <param name="paths"></param>
-    /// <returns></returns>
     public static string StartUpDir(params string[] paths)
     {
         var binaryPath = typeof(App).Assembly.Location;
@@ -87,8 +83,6 @@ public class App
     /// For portable mode, ConfigDir = Installed Dir, else %appdata%\ImageGlass
     /// </summary>
     /// <param name="type">Indicates if the given path is either file or directory</param>
-    /// <param name="paths"></param>
-    /// <returns></returns>
     public static string ConfigDir(PathType type, params string[] paths)
     {
         // use StartUp dir if it's writable

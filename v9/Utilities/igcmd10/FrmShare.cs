@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -60,7 +60,14 @@ partial class FrmShare : Form
     {
         if (Program.Args.Length > 1)
         {
-            WinShare.ShowShare(Handle, Program.Args.Skip(1).ToArray());
+            var args = Program.Args
+                // remove the exe file path
+                .Skip(1)
+                // remove the other commands
+                .Where(i => !i.StartsWith("--"))
+                .ToArray();
+
+            WinShare.ShowShare(Handle, args);
         }
         else
         {

@@ -27,7 +27,7 @@ namespace ImageGlass;
 /// <summary>
 /// Provides settings for Crop tool.
 /// </summary>
-public class CropToolConfig: IToolConfig
+public class CropToolConfig : IToolConfig
 {
     public string ToolId { get; init; }
 
@@ -59,13 +59,13 @@ public class CropToolConfig: IToolConfig
     /// <summary>
     /// Gets, sets the custom selection area is used for <see cref="DefaultSelectionType.CustomArea"/>.
     /// </summary>
-    public Rectangle InitSelectedArea {  get; set; } = Rectangle.Empty;
+    public Rectangle InitSelectedArea { get; set; } = Rectangle.Empty;
 
 
     /// <summary>
     /// Gets, sets the option to center the <see cref="InitSelectedArea"/>.
     /// </summary>
-    public bool AutoCenterSelection { get; set; } = false;
+    public bool AutoCenterSelection { get; set; } = true;
 
 
     /// <summary>
@@ -79,7 +79,7 @@ public class CropToolConfig: IToolConfig
 
     public void LoadFromAppConfig()
     {
-        var toolConfig = Config.Tools.GetValue(ToolId);
+        var toolConfig = Config.ToolSettings.GetValue(ToolId);
         if (toolConfig is not ExpandoObject config) return;
 
 
@@ -145,7 +145,7 @@ public class CropToolConfig: IToolConfig
 
 
         // save to app config
-        Config.Tools.Set(ToolId, settings);
+        Config.ToolSettings.Set(ToolId, settings);
     }
 
 }

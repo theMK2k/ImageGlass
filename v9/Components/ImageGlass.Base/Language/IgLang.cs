@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -114,10 +114,13 @@ public class IgLang : Dictionary<string, string>
         Add("_._Quit", "Quit"); // v9.0
         Add("_._Error", "Error"); // v9.0
         Add("_._Warning", "Warning"); // v9.0
+        Add("_.Copy", "Copy"); //v9.0
 
         Add("_._UnhandledException", "Unhandled exception"); // v9.0
         Add("_._UnhandledException._Description", "Unhandled exception has occurred. If you click Continue, the application will ignore this error and attempt to continue. If you click Quit, the application will close immediately."); // v9.0
         Add("_._DoNotShowThisMessageAgain", "Do not show this message again"); // v9.0
+        Add($"_._CreatingFile", "Create temporary image file..."); //v9.0
+        Add($"_._CreatingFileError", "Could not create temporary image file"); //v9.0
 
 
         Add($"_.{nameof(ImageOrderBy)}._{nameof(ImageOrderBy.Name)}", "Name (default)"); //v8.0
@@ -132,15 +135,24 @@ public class IgLang : Dictionary<string, string>
         Add($"_.{nameof(ImageOrderType)}._{nameof(ImageOrderType.Asc)}", "Ascending");  //v8.0
         Add($"_.{nameof(ImageOrderType)}._{nameof(ImageOrderType.Desc)}", "Descending");  //v8.0
 
-        //Add("_.AfterOpeningEditAppAction._Nothing", "Nothing"); //v8.0
-        //Add("_.AfterOpeningEditAppAction._Minimize", "Minimize"); //v8.0
-        //Add("_.AfterOpeningEditAppAction._Close", "Close"); //v8.0
+        Add($"_.{nameof(AfterEditAppAction)}._{nameof(AfterEditAppAction.Nothing)}", "Nothing"); //v8.0
+        Add($"_.{nameof(AfterEditAppAction)}._{nameof(AfterEditAppAction.Minimize)}", "Minimize"); //v8.0
+        Add($"_.{nameof(AfterEditAppAction)}._{nameof(AfterEditAppAction.Close)}", "Close"); //v8.0
 
 
         Add("_._UserAction._MenuNotFound", "Cannot find menu '{0}' to invoke its action."); // v9.0
         Add("_._UserAction._MethodNotFound", "Cannot find method '{0}' to invoke its action."); // v9.0
         Add("_._UserAction._MethodArgumentNotSupported", "The argument type of method '{0}' is not supported."); // v9.0
 
+        // Gallery tooltip
+        Add($"_.Metadata._{nameof(IgMetadata.FileSize)}", "File size"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.FileCreationTime)}", "Date created"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.FileLastAccessTime)}", "Date accessed"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.FileLastWriteTime)}", "Date modified"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.FramesCount)}", "Frames"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.ExifRatingPercent)}", "Rating"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.ColorSpace)}", "Color space"); //v9.0
+        Add($"_.Metadata._{nameof(IgMetadata.ColorProfile)}", "Color profile"); //v9.0
 
 
         #region FrmMain
@@ -164,16 +176,11 @@ public class IgLang : Dictionary<string, string>
         Add("FrmMain.MnuReloadImageList", "Reload image list"); //v7.0
         Add("FrmMain.MnuUnload", "Unload image"); //v9.0
         Add("FrmMain.MnuOpenWith", "Open with…"); //v7.6
-        Add("FrmMain.MnuOpenWith._CreatingFile", "Creating image file for opening with the other apps..."); //v9.0
-        Add("FrmMain.MnuOpenWith._CreatingFileError", "Could not create the image file for opening with the other apps..."); //v9.0
-        Add("FrmMain.MnuEdit", "Edit image {0}…"); //v3.0, updated 4.0
+        Add("FrmMain.MnuEdit", "Edit image {0}…"); //v3.0,
+        Add("FrmMain.MnuEdit._AppNotFound", "Could not find the associated app for editing. You can assign an app for editing this format in ImageGlass Settings > Edit."); //v9.0
         Add("FrmMain.MnuPrint", "Print…"); //v3.0
-        Add("FrmMain.MnuPrint._CreatingFile", "Creating image file for printing..."); //v9.0
-        Add("FrmMain.MnuPrint._CreatingFileError", "Could not create the image file for printing"); //v9.0
         Add("FrmMain.MnuPrint._Error", "Could not print the viewing image"); //v9.0
         Add("FrmMain.MnuShare", "Share…"); //v8.6
-        Add("FrmMain.MnuShare._CreatingFile", "Creating image file for sharing..."); //v9.0
-        Add("FrmMain.MnuShare._CreatingFileError", "Could not create the image file for sharing"); //v9.0
         Add("FrmMain.MnuShare._Error", "Could not open Share dialog."); //v9.0
         #endregion
 
@@ -245,31 +252,27 @@ public class IgLang : Dictionary<string, string>
         Add("FrmMain.MnuMoveToRecycleBin._Description", "Do you want to move this file to the Recycle bin?"); //v3.0
         Add("FrmMain.MnuDeleteFromHardDisk", "Delete from hard disk"); //v3.0
         Add("FrmMain.MnuDeleteFromHardDisk._Description", "Are you sure you want to permanently delete this file?"); //v3.0
-        Add("FrmMain.MnuExtractFrames", "Extract image frames ({0})…"); //v7.5
-        Add("FrmMain.MnuStartStopAnimating", "Start / Stop animating image"); //v3.0
+        Add("FrmMain.MnuExportFrames", "Export image frames ({0})…"); //v7.5
+        Add("FrmMain.MnuToggleImageAnimation", "Start / stop animating image"); //v3.0
         Add("FrmMain.MnuSetDesktopBackground", "Set as Desktop background"); //v3.0
-        Add("FrmMain.MnuSetDesktopBackground._CreatingFile", "Creating image file for desktop background..."); //v9.0
-        Add("FrmMain.MnuSetDesktopBackground._CreatingFileError", "Could not create the image for desktop background"); //v9.0
         Add("FrmMain.MnuSetDesktopBackground._Error", "Could not set the viewing image as desktop background"); // v6.0
         Add("FrmMain.MnuSetDesktopBackground._Success", "Desktop background is updated"); // v6.0
         Add("FrmMain.MnuSetLockScreen", "Set as Lock screen image"); // V6.0
         Add("FrmMain.MnuSetLockScreen._Error", "Could not set the viewing image as lock screen image"); // v6.0
         Add("FrmMain.MnuSetLockScreen._Success", "Lock screen image is updated"); // v6.0
-        Add("FrmMain.MnuSetLockScreen._CreatingFile", "Creating image file for lock screen..."); //v9.0
-        Add("FrmMain.MnuSetLockScreen._CreatingFileError", "Could not create the image for lock screen"); //v9.0
         Add("FrmMain.MnuOpenLocation", "Open image location"); //v3.0
         Add("FrmMain.MnuImageProperties", "Image properties"); //v3.0
         #endregion // Image
 
         #region Clipboard
         Add("FrmMain.MnuClipboard", "Clipboard"); //v3.0
-        Add("FrmMain.MnuCopy", "Copy"); //v3.0
-        Add("FrmMain.MnuCopy._Success", "Copied {0} file(s)."); // v2.0 final
+        Add("FrmMain.MnuCopyFile", "Copy file"); //v3.0
+        Add("FrmMain.MnuCopyFile._Success", "Copied {0} file(s)."); // v2.0 final
         Add("FrmMain.MnuCopyImageData", "Copy image data"); //v5.0
         Add("FrmMain.MnuCopyImageData._Copying", "Copying the image data. It's going to take a while..."); // v9.0
         Add("FrmMain.MnuCopyImageData._Success", "Copied the current image data."); // v5.0
-        Add("FrmMain.MnuCut", "Cut"); //v3.0
-        Add("FrmMain.MnuCut._Success", "Cut {0} file(s)."); // v2.0 final
+        Add("FrmMain.MnuCutFile", "Cut file"); //v3.0
+        Add("FrmMain.MnuCutFile._Success", "Cut {0} file(s)."); // v2.0 final
         Add("FrmMain.MnuCopyPath", "Copy image path"); //v3.0
         Add("FrmMain.MnuCopyPath._Success", "Copied the current image path."); // v9.0
         Add("FrmMain.MnuPasteImage", "Paste image"); //v3.0
@@ -280,10 +283,18 @@ public class IgLang : Dictionary<string, string>
         #endregion
 
         Add("FrmMain.MnuWindowFit", "Window fit"); //v7.5
+        Add("FrmMain.MnuWindowFit._Enable", "Window fit is enabled"); // v9.0
+        Add("FrmMain.MnuWindowFit._Disable", "Window fit is disabled"); // v9.0
+
         Add("FrmMain.MnuFullScreen", "Full screen"); //v3.0
-        Add("FrmMain.MnuFullScreen._Enable", "Enabled Full screen mode"); // v9.0
+        Add("FrmMain.MnuFullScreen._Enable", "Full screen window is enabled"); // v9.0
         Add("FrmMain.MnuFullScreen._EnableDescription", "Press {0} to exit full screen mode."); // v2.0
+        Add("FrmMain.MnuFullScreen._Disable", "Full screen window is disabled"); // v9.0
+
         Add("FrmMain.MnuFrameless", "Frameless"); //v7.5
+        Add("FrmMain.MnuFrameless._Enable", "Frameless window is enabled"); // v9.0
+        Add("FrmMain.MnuFrameless._EnableDescription", "Hold Shift key to move the window."); // v7.5
+        Add("FrmMain.MnuFrameless._Disable", "Frameless window is disabled"); // v9.0
 
         #region Slideshow
         Add("FrmMain.MnuSlideshow", "Slideshow"); //v3.0
@@ -306,8 +317,6 @@ public class IgLang : Dictionary<string, string>
         Add("FrmMain.MnuColorPicker", "Color picker"); //v5.0
         Add("FrmMain.MnuPageNav", "Page navigation"); // v7.5
         Add("FrmMain.MnuCropTool", "Crop image"); // v7.6
-        Add("FrmMain.MnuExifTool", "Exif tool"); // v8.0
-        
         #endregion
 
         Add("FrmMain.MnuSettings", "Settings…"); // v3.0
@@ -344,10 +353,8 @@ public class IgLang : Dictionary<string, string>
         Add("FrmMain._OpenFileDialog", "All supported files");
         Add("FrmMain._Files", "file(s)"); // v7.5
         Add("FrmMain._Loading", "Loading..."); // v3.0
-        //Add("FrmMain._Pages", "pages"); // v7.5
+                                               //Add("FrmMain._Pages", "pages"); // v7.5
 
-        //Add("FrmMain._ExtractPageText", "Extracting image pages. Please select output folder.");
-        
         //Add("FrmMain._SaveChanges", "Saving change..."); // v2.0 final
 
         Add("FrmMain._ReachedFirstImage", "Reached the first image"); // v4.0
@@ -356,22 +363,13 @@ public class IgLang : Dictionary<string, string>
         //Add("FrmMain._SetLockImage_Error", "There was an error while setting lock screen image"); // v6.0
         //Add("FrmMain._SetLockImage_Success", "Lock screen image was set successfully"); //v6.0
 
-
         //Add("FrmMain._PageExtractComplete", "Page extraction completed."); // v7.5
-        //Add("FrmMain._Frameless", "Hold SHIFT to move the window."); // v7.5
+
 
         Add("FrmMain._ClipboardImage", "Clipboard image"); //v9.0
 
 
         #endregion
-
-        // Gallery tooltip
-        Add($"FrmMain.Gallery.Tooltip._{nameof(IgMetadata.FileSize)}", "File size"); //v9.0
-        Add($"FrmMain.Gallery.Tooltip._{nameof(IgMetadata.FileCreationTime)}", "Date created"); //v9.0
-        Add($"FrmMain.Gallery.Tooltip._{nameof(IgMetadata.FileLastAccessTime)}", "Date accessed"); //v9.0
-        Add($"FrmMain.Gallery.Tooltip._{nameof(IgMetadata.FileLastWriteTime)}", "Date modified"); //v9.0
-        Add($"FrmMain.Gallery.Tooltip._{nameof(IgMetadata.FramesCount)}", "Frames"); //v9.0
-        Add($"FrmMain.Gallery.Tooltip._Rating", "Rating"); //v9.0
 
 
         #endregion
@@ -552,8 +550,6 @@ public class IgLang : Dictionary<string, string>
         #region TAB Toolbar
         //Add("FrmSetting.lblToolbarPosition", "Toolbar position:"); // v5.5
         //Add("FrmSetting.lblToolbarIconHeight", "Toolbar icon size:");
-        //Add("FrmSetting.cmbToolbarPosition._Top", "Top"); // v5.5
-        //Add("FrmSetting.cmbToolbarPosition._Bottom", "Bottom"); // v5.5
 
         //// V5.0
         //Add("FrmSetting._separator", "Separator"); // i.e. 'toolbar separator'
@@ -570,10 +566,7 @@ public class IgLang : Dictionary<string, string>
         #endregion
 
         #region TAB Tools
-        //Add("FrmSetting.chkColorUseRGBA", "Use RGB format with Alpha value"); //v5.0
-        //Add("FrmSetting.chkColorUseHEXA", "Use HEX format with Alpha value"); //v5.0
-        //Add("FrmSetting.chkColorUseHSLA", "Use HSL format with Alpha value"); //v5.0
-        //Add("FrmSetting.chkColorUseHSVA", "Use HSV format with Alpha value"); //v8.0
+
         //Add("FrmSetting.lblDefaultColorCode", "Default color code format when copying"); //v5.0
 
         //Add("FrmSetting.chkShowPageNavAuto", "Auto-show Page navigation tool for multi-page image"); //v7.5
@@ -716,16 +709,37 @@ public class IgLang : Dictionary<string, string>
 
         #endregion
 
-        #region FrmExifTool
-        Add("FrmExifTool.clnProperty", "Property"); // v8.0
-        Add("FrmExifTool.clnValue", "Value"); // v8.0
+        #region FrmColorPicker
 
-        Add("FrmExifTool.btnCopyValue", "Copy value"); // v8.0
-        Add("FrmExifTool.btnExport", "Export…"); // v8.0
-        Add("FrmExifTool.btnClose", "Close"); // v8.0
+        Add("FrmColorPicker.BtnSettings._Tooltip", "Open Color picker settings…"); //v9.0
+
+        // Color picker settings
+        Add("FrmColorPickerSettings._Title", "Color picker settings"); //v9.0
+        Add("FrmColorPickerSettings.ChkShowRgbA", "Use RGB format with alpha value"); //v5.0
+        Add("FrmColorPickerSettings.ChkShowHexA", "Use HEX format with alpha value"); //v5.0
+        Add("FrmColorPickerSettings.ChkShowHslA", "Use HSL format with alpha value"); //v5.0
+        Add("FrmColorPickerSettings.ChkShowHsvA", "Use HSV format with alpha value"); //v8.0
 
         #endregion
 
+
+        // External tools ----------------------------------------------------
+        Add("FrmToolNotFound._Title", "Tool not found"); // v9.0
+        Add("FrmToolNotFound.BtnSelectExecutable", "Select…"); // v9.0
+        Add("FrmToolNotFound.LblHeading", "{0} is not found!"); // v9.0
+        Add("FrmToolNotFound.LblDescription", "ImageGlass could not find executable file of {0}. Please provide the executable path of the tool."); // v9.0
+        Add("FrmToolNotFound.LblDownloadToolText", "You can download more tools for ImageGlass at:"); // v9.0
+
+
+        #region Tool_ExifTool
+        Add($"_.Tools.{Constants.IGTOOL_EXIFTOOL}.ClnProperty", "Property"); // v8.0
+        Add($"_.Tools.{Constants.IGTOOL_EXIFTOOL}.ClnValue", "Value"); // v8.0
+
+        Add($"_.Tools.{Constants.IGTOOL_EXIFTOOL}.BtnCopyValue", "Copy value"); // v8.0
+        Add($"_.Tools.{Constants.IGTOOL_EXIFTOOL}.BtnExport", "Export…"); // v8.0
+        Add($"_.Tools.{Constants.IGTOOL_EXIFTOOL}.BtnClose", "Close"); // v8.0
+
+        #endregion
 
 
         #region igcmd.exe
@@ -746,8 +760,19 @@ public class IgLang : Dictionary<string, string>
 
         Add("FrmSlideshow.MnuToggleCountdown", "Show slideshow countdown"); // v9.0
         Add("FrmSlideshow.MnuZoomModes", "Zoom modes"); // v9.0
-        
+
         #endregion
+
+
+        #region FrmExportFrames
+        Add("FrmExportFrames._Title", "Export image frames"); //v9.0
+        Add("FrmExportFrames._FileNotExist", "Image file does not exist"); //v7.5
+        Add("FrmExportFrames._FolderPickerTitle", "Select output folder for exporting image frames"); //v9.0
+        Add("FrmExportFrames._Exporting", "Exporting {0}/{1} frames \r\n{2}..."); //v9.0
+        Add("FrmExportFrames._ExportDone", "Exported {0} frames successfully to \r\n{1}"); //v9.0
+        Add("FrmExportFrames._OpenOutputFolder", "Open output folder"); //v9.0
+        #endregion
+
 
         #endregion
 

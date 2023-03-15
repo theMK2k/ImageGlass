@@ -18,12 +18,12 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 using D2Phap;
 using ImageGlass.Base;
-using ImageGlass.Base.NamedPipes;
 using ImageGlass.Base.PhotoBox;
 using ImageGlass.Base.Photoing.Codecs;
 using ImageGlass.Base.Services;
 using ImageGlass.Base.WinApi;
 using ImageGlass.Settings;
+using ImageGlass.Tools;
 using ImageGlass.UI;
 using ImageGlass.Views;
 using System.Diagnostics;
@@ -101,7 +101,7 @@ public partial class FrmSlideshow : ModernForm
 
         Config.Load();
 
-        _serverName = $"{Constants.SLIDESHOW_PIPE_PREFIX}{slideshowIndex}"; ;
+        _serverName = $"{Constants.SLIDESHOW_PIPE_PREFIX}{slideshowIndex}";
         _initImagePath = initImagePath;
 
 
@@ -113,7 +113,7 @@ public partial class FrmSlideshow : ModernForm
         // update theme icons
         OnDpiChanged();
 
-        ApplyTheme(Config.Theme.Settings.IsDarkMode);
+        ApplyTheme(Config.Theme.Settings.IsDarkMode, Config.WindowBackdrop);
     }
 
 
@@ -121,7 +121,7 @@ public partial class FrmSlideshow : ModernForm
     {
         SuspendLayout();
 
-        
+
         PicMain.InterpolationScaleDown = Config.ImageInterpolationScaleDown;
         PicMain.InterpolationScaleUp = Config.ImageInterpolationScaleUp;
 
@@ -142,19 +142,21 @@ public partial class FrmSlideshow : ModernForm
     }
 
 
-    protected override void ApplyTheme(bool darkMode, BackdropStyle? backDrop = null)
+    protected override void ApplyTheme(bool darkMode, BackdropStyle? style = null)
     {
         SuspendLayout();
         MnuContext.Theme = Config.Theme;
 
-
-        darkMode = Config.Theme.Settings.IsDarkMode;
-        var backdrop = Config.WindowBackdrop;
+        if (!EnableTransparent)
+        {
+            BackColor = Config.SlideshowBackgroundColor.NoAlpha();
+        }
 
 
         // viewer
         PicMain.BackColor = Config.SlideshowBackgroundColor;
         PicMain.ForeColor = PicMain.BackColor.InvertBlackOrWhite(220);
+        PicMain.AccentColor = WinColorsApi.GetAccentColor(true);
 
 
         // navigation buttons
@@ -164,8 +166,9 @@ public partial class FrmSlideshow : ModernForm
         PicMain.NavLeftImage = Config.Theme.Settings.NavButtonLeft;
         PicMain.NavRightImage = Config.Theme.Settings.NavButtonRight;
 
+
         ResumeLayout(false);
-        base.ApplyTheme(darkMode, backdrop);
+        base.ApplyTheme(darkMode, style);
     }
 
 
@@ -179,8 +182,14 @@ public partial class FrmSlideshow : ModernForm
 
     protected override void OnRequestUpdatingColorMode(SystemColorModeChangedEventArgs e)
     {
-        // update theme here
-        ApplyTheme(e.IsDarkMode);
+        // theme mode is changed, need to load the corresponding theme pack
+        Config.LoadThemePack(e.IsDarkMode, true, true);
+
+        // load the theme icons
+        OnDpiChanged();
+
+        // apply theme to controls
+        ApplyTheme(Config.Theme.Settings.IsDarkMode);
 
         base.OnRequestUpdatingColorMode(e);
     }
@@ -189,6 +198,7 @@ public partial class FrmSlideshow : ModernForm
     protected override void OnDpiChanged()
     {
         base.OnDpiChanged();
+        SuspendLayout();
 
         // scale toolbar icons corresponding to DPI
         var newIconHeight = DpiApi.Transform(Config.ToolbarIconHeight);
@@ -198,7 +208,9 @@ public partial class FrmSlideshow : ModernForm
 
         // update picmain scaling
         PicMain.NavButtonSize = this.ScaleToDpi(new SizeF(60f, 60f));
-        PicMain.CheckerboardCellSize = this.ScaleToDpi(8f);
+        PicMain.CheckerboardCellSize = this.ScaleToDpi(Constants.VIEWER_GRID_SIZE);
+
+        ResumeLayout(false);
     }
 
     protected override void OnDpiChanged(DpiChangedEventArgs e)
@@ -218,7 +230,7 @@ public partial class FrmSlideshow : ModernForm
         PicMain.MouseWheel += PicMain_MouseWheel;
 
         // windowed slideshow
-        if (Config.UseWindowedSlideshow)
+        if (Config.EnableWindowedSlideshow)
         {
             // load window placement from settings
             WindowSettings.SetPlacementToWindow(this, WindowSettings.GetFrmMainPlacementFromConfig());
@@ -325,28 +337,23 @@ public partial class FrmSlideshow : ModernForm
 
     private void Client_MessageReceived(object? sender, MessageReceivedEventArgs e)
     {
-        if (string.IsNullOrEmpty(e.Message)) return;
+        if (string.IsNullOrEmpty(e.MessageName)) return;
 
-        if (e.Message == Constants.SLIDESHOW_PIPE_CMD_TERMINATE)
+
+        // terminate slideshow
+        if (e.MessageName == ToolServerMsgs.TOOL_TERMINATE)
         {
             Application.Exit();
             return;
         }
 
-        var firstEqualCharPosition = e.Message.IndexOf("=");
-        if (firstEqualCharPosition == -1) return;
 
-        var cmd = e.Message.Substring(0, firstEqualCharPosition);
-        if (string.IsNullOrEmpty(cmd)) return;
-
-        var arg = e.Message.Substring(++firstEqualCharPosition);
-        if (string.IsNullOrEmpty(arg)) return;
-
+        if (string.IsNullOrEmpty(e.MessageData)) return;
 
         // update image list
-        if (cmd.Equals(SlideshowPipeCommands.SET_IMAGE_LIST, StringComparison.InvariantCultureIgnoreCase))
+        if (e.MessageName.Equals(SlideshowPipeCommands.SET_IMAGE_LIST, StringComparison.InvariantCultureIgnoreCase))
         {
-            var list = BHelper.ParseJson<List<string>>(arg);
+            var list = BHelper.ParseJson<List<string>>(e.MessageData);
 
             if (list != null && list.Count > 0)
             {
@@ -364,18 +371,18 @@ public partial class FrmSlideshow : ModernForm
 
 
         // update language
-        if (cmd.Equals(SlideshowPipeCommands.SET_LANGUAGE, StringComparison.InvariantCultureIgnoreCase))
+        if (e.MessageName.Equals(SlideshowPipeCommands.SET_LANGUAGE, StringComparison.InvariantCultureIgnoreCase))
         {
-            Config.Language = new IgLang(arg, App.StartUpDir(Dir.Languages));
+            Config.Language = new IgLang(e.MessageData, App.StartUpDir(Dir.Languages));
             LoadLanguage();
             return;
         }
 
 
         // update theme
-        if (cmd.Equals(SlideshowPipeCommands.SET_THEME, StringComparison.InvariantCultureIgnoreCase))
+        if (e.MessageName.Equals(SlideshowPipeCommands.SET_THEME, StringComparison.InvariantCultureIgnoreCase))
         {
-            Config.Theme = new IgTheme(arg, Config.ToolbarIconHeight);
+            Config.Theme = new IgTheme(e.MessageData, Config.ToolbarIconHeight);
 
             ApplyTheme(Config.Theme.Settings.IsDarkMode);
             return;
@@ -394,7 +401,7 @@ public partial class FrmSlideshow : ModernForm
             if (_currentIndex == _images.Length - 1)
             {
                 // loop the list
-                if (!Config.LoopSlideshow)
+                if (!Config.ShouldLoopSlideshow)
                 {
                     // pause slideshow
                     SetSlideshowState(false, false);
@@ -554,7 +561,7 @@ public partial class FrmSlideshow : ModernForm
     }
 
 
-    private void PicMain_MouseClick(object sender, MouseEventArgs e)
+    private void PicMain_MouseClick(object? sender, MouseEventArgs e)
     {
         if (_isCursorHidden)
         {
@@ -566,22 +573,22 @@ public partial class FrmSlideshow : ModernForm
     }
 
 
-    private void PicMain_OnNavLeftClicked(MouseEventArgs e)
+    private void PicMain_OnNavLeftClicked(object? sender, MouseEventArgs e)
     {
         _ = ViewNextImageAsync(-1);
     }
 
-    private void PicMain_OnNavRightClicked(MouseEventArgs e)
+    private void PicMain_OnNavRightClicked(object? sender, MouseEventArgs e)
     {
         _ = ViewNextImageAsync(1);
     }
 
-    private void PicMain_OnZoomChanged(ZoomEventArgs e)
+    private void PicMain_OnZoomChanged(object? sender, ZoomEventArgs e)
     {
         UpdateImageInfo(ImageInfoUpdateTypes.Zoom);
     }
 
-    private void PicMain_MouseMove(object sender, MouseEventArgs e)
+    private void PicMain_MouseMove(object? sender, MouseEventArgs e)
     {
         if (_isCursorHidden)
         {
@@ -609,7 +616,7 @@ public partial class FrmSlideshow : ModernForm
             var list = BHelper.SortImageList(fileList,
                 Config.ImageLoadingOrder,
                 Config.ImageLoadingOrderType,
-                Config.GroupImagesByDirectory);
+                Config.ShouldGroupImagesByDirectory);
             _images = new ImageBooster(list)
             {
                 MaxQueue = 1,
@@ -722,7 +729,7 @@ public partial class FrmSlideshow : ModernForm
         var readSettings = new CodecReadOptions()
         {
             ColorProfileName = Config.ColorProfile,
-            ApplyColorProfileForAll = Config.ApplyColorProfileForAll,
+            ApplyColorProfileForAll = Config.ShouldUseColorProfileForAll,
             ImageChannel = ColorChannel.All,
             AutoScaleDownLargeImage = true,
             UseEmbeddedThumbnailRawFormats = Config.UseEmbeddedThumbnailRawFormats,
@@ -807,8 +814,19 @@ public partial class FrmSlideshow : ModernForm
         {
             PicMain.SetImage(null);
 
-            PicMain.ShowMessage(photo.Error.Source + ": " + photo.Error.Message,
-                Config.Language[$"FrmMain.PicMain._ErrorText"]);
+            var emoji = BHelper.IsOS(WindowsOS.Win11OrLater) ? "🥲" : "🙄";
+            var archInfo = Environment.Is64BitProcess ? "64-bit" : "32-bit";
+            var appVersion = App.Version + $" ({archInfo}, .NET {Environment.Version})";
+
+            var debugInfo = $"ImageGlass {Constants.APP_CODE.CapitalizeFirst()} v{appVersion}" +
+                $"\r\n{ImageMagick.MagickNET.Version}" +
+                $"\r\n" +
+                $"\r\nℹ️ Error details:" +
+                $"\r\n";
+
+            PicMain.ShowMessage(debugInfo +
+                photo.Error.Source + ": " + photo.Error.Message,
+                Config.Language[$"FrmMain.PicMain._ErrorText"] + $" {emoji}");
         }
 
         else if (!(photo?.ImgData.IsImageNull ?? true))
@@ -1358,8 +1376,8 @@ public partial class FrmSlideshow : ModernForm
 
     private void MnuFullScreen_Click(object sender, EventArgs e)
     {
-        Config.UseWindowedSlideshow = !Config.UseWindowedSlideshow;
-        SetFullScreenMode(!Config.UseWindowedSlideshow);
+        Config.EnableWindowedSlideshow = !Config.EnableWindowedSlideshow;
+        SetFullScreenMode(!Config.EnableWindowedSlideshow);
     }
 
     /// <summary>
@@ -1382,9 +1400,9 @@ public partial class FrmSlideshow : ModernForm
             WindowState = FormWindowState.Normal;
             Bounds = Screen.FromControl(this).Bounds;
 
-            // disable background colors
-            WindowApi.SetWindowFrame(Handle, new Padding(0));
-            PicMain.BackColor = Config.SlideshowBackgroundColor.NoAlpha();
+            //// disable background colors
+            //WindowApi.SetWindowFrame(Handle, new Padding(0));
+            //PicMain.BackColor = Config.SlideshowBackgroundColor.NoAlpha();
 
             Visible = true;
         }
@@ -1416,9 +1434,9 @@ public partial class FrmSlideshow : ModernForm
                 FormBorderStyle = FormBorderStyle.Sizable;
             }
 
-            // re-enable background colors
-            WindowApi.SetWindowFrame(Handle, BackdropMargin);
-            PicMain.BackColor = Config.SlideshowBackgroundColor;
+            //// re-enable background colors
+            //WindowApi.SetWindowFrame(Handle, BackdropMargin);
+            //PicMain.BackColor = Config.SlideshowBackgroundColor;
 
             Config.UpdateFormIcon(this);
         }

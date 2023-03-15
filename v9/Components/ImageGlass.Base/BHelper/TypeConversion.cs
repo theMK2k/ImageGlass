@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -41,9 +41,9 @@ public partial class BHelper
     /// Returns <c>default</c> value of the type if the <paramref name="value"/>
     /// is not convertable or null.
     /// </returns>
-    public static T? ConvertType<T>(object? value)
+    public static T? ConvertType<T>(object? value, T? defaultValue = default)
     {
-        if (value == null) return default;
+        if (value == null) return defaultValue;
         var type = typeof(T);
 
         try
@@ -57,7 +57,7 @@ public partial class BHelper
         }
         catch (Exception)
         {
-            return default;
+            return defaultValue;
         }
     }
 }

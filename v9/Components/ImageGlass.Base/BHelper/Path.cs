@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -230,6 +230,24 @@ public partial class BHelper
             });
         }
         catch { }
+    }
+
+
+    /// <summary>
+    /// Opens file path in Explorer and selects it.
+    /// </summary>
+    public static void OpenFilePath(string? filePath)
+    {
+        if (string.IsNullOrEmpty(filePath)) return;
+
+        try
+        {
+            ExplorerApi.OpenFolderAndSelectItem(filePath);
+        }
+        catch
+        {
+            using var proc = Process.Start("explorer.exe", $"/select,\"{filePath}\"");
+        }
     }
 
 

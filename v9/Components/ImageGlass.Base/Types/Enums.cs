@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -36,16 +36,6 @@ public enum UpdateRequests
 
 
 /// <summary>
-/// Toolbar position
-/// </summary>
-public enum ToolbarPosition
-{
-    Top = 0,
-    Bottom = 1,
-}
-
-
-/// <summary>
 /// Color channels of image, the value should be same as MagickImage.Channels enum
 /// </summary>
 public enum ColorChannel
@@ -71,17 +61,6 @@ public enum PathType
 
 
 /// <summary>
-/// Actions after opening editing app
-/// </summary>
-public enum AfterOpeningEditAppAction
-{
-    Nothing = 0,
-    Minimize = 1,
-    Close = 2,
-}
-
-
-/// <summary>
 /// Determines Windows OS requirement
 /// </summary>
 public enum WindowsOS
@@ -89,7 +68,7 @@ public enum WindowsOS
     /// <summary>
     /// Build 22621
     /// </summary>
-    Win11_22H2,
+    Win11_22H2_OrLater,
 
     /// <summary>
     /// Build 22000
@@ -125,6 +104,16 @@ public enum FlipOptions
 
 
 /// <summary>
+/// Rotate option.
+/// </summary>
+public enum RotateOption
+{
+    Left = 0,
+    Right = 1,
+}
+
+
+/// <summary>
 /// Selection aspect ratio.
 /// </summary>
 public enum SelectionAspectRatio
@@ -150,9 +139,9 @@ public enum SelectionAspectRatio
 public enum BackdropStyle
 {
     /// <summary>
-    /// Use default setting of Windows
+    /// Use default setting of Windows.
     /// </summary>
-    Default = 0,
+    None = 0,
 
     /// <summary>
     /// Mica effect.
@@ -169,3 +158,16 @@ public enum BackdropStyle
     /// </summary>
     MicaAlt = 4,
 }
+
+
+/// <summary>
+/// Options indicate what source of image is saved.
+/// </summary>
+public enum ImageSaveSource
+{
+    Undefined,
+    SelectedArea,
+    Clipboard,
+    CurrentFile,
+}
+

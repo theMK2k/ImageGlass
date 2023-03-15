@@ -40,17 +40,22 @@ public partial class FrmSettings : ModernForm
     {
         EnableTransparent = darkMode;
 
+        if (!EnableTransparent)
+        {
+            BackColor = Config.Theme.ColorPalatte.AppBackground;
+        }
+
         base.ApplyTheme(darkMode, style);
     }
 
 
-    //protected override void OnRequestUpdatingColorMode(SystemColorModeChangedEventArgs e)
-    //{
-    //    // update theme here
-    //    ApplyTheme(e.IsDarkMode);
+    protected override void OnRequestUpdatingColorMode(SystemColorModeChangedEventArgs e)
+    {
+        // apply theme to controls
+        ApplyTheme(Config.Theme.Settings.IsDarkMode);
 
-    //    base.OnRequestUpdatingColorMode(e);
-    //}
+        base.OnRequestUpdatingColorMode(e);
+    }
 
 
     private void btnOpenSettingsFile_Click(object sender, EventArgs e)

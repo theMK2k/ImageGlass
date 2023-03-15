@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -50,10 +50,10 @@ public enum ImageSource
 public enum MouseAndNavLocation
 {
     Outside = 0,
-    
+
     LeftNav = 1 << 1,
     RightNav = 1 << 2,
-    
+
     BothNavs = 1 << 3,
 }
 
@@ -93,4 +93,12 @@ public enum ImageDrawingState
     /// Image is done all drawings, animations and shown on the canvas.
     /// </summary>
     Done,
+}
+
+
+public enum NavCheck
+{
+    Both,
+    LeftOnly,
+    RightOnly,
 }

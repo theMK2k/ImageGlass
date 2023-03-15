@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010-2023 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -170,7 +170,7 @@ public class WindowApi
         HRESULT result;
         unsafe
         {
-            if (BHelper.IsOS(WindowsOS.Win11_22H2))
+            if (BHelper.IsOS(WindowsOS.Win11_22H2_OrLater))
             {
                 var attr = DWMWINDOWATTRIBUTE_UNDOCUMENTED.DWMWA_SYSTEMBACKDROP_TYPE;
 

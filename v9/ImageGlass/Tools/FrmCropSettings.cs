@@ -19,7 +19,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 using ImageGlass.Base;
 using ImageGlass.Settings;
-using ImageGlass.UI;
 
 namespace ImageGlass;
 
@@ -45,6 +44,10 @@ public partial class FrmCropSettings : DialogForm
         ApplyTheme(Config.Theme.Settings.IsDarkMode);
         ApplyLanguage();
         LoadSettings();
+
+
+        var workingArea = Screen.FromControl(this).WorkingArea;
+        if (Bottom > workingArea.Bottom) Top = workingArea.Bottom - Height;
     }
 
 
@@ -53,7 +56,7 @@ public partial class FrmCropSettings : DialogForm
         SuspendLayout();
 
 
-        tableTop.BackColor = Config.Theme.ColorPalatte.AppBackground;
+        TableTop.BackColor = Config.Theme.ColorPalatte.AppBackground;
 
 
         base.ApplyTheme(darkMode, style);
@@ -61,26 +64,17 @@ public partial class FrmCropSettings : DialogForm
     }
 
 
-    //protected override void OnRequestUpdatingColorMode(SystemColorModeChangedEventArgs e)
-    //{
-    //    // update theme here
-    //    ApplyTheme(e.IsDarkMode);
-
-    //    base.OnRequestUpdatingColorMode(e);
-    //}
-
-
     protected override int OnUpdateHeight(bool performUpdate = true)
     {
         var baseHeight = base.OnUpdateHeight(false);
-        var contentHeight = tableTop.Height;
+        var formHeight = TableTop.Height + baseHeight;
 
-        if (performUpdate)
+        if (performUpdate && Height != formHeight)
         {
-            Height = contentHeight + baseHeight;
+            Height = formHeight;
         }
 
-        return contentHeight;
+        return formHeight;
     }
 
 

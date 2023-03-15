@@ -20,7 +20,6 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 using ImageGlass.Base;
 using ImageGlass.Base.Actions;
 using ImageGlass.Base.PhotoBox;
-using ImageGlass.Base.WinApi;
 using ImageGlass.Settings;
 using ImageGlass.UI;
 
@@ -99,15 +98,17 @@ public partial class FrmMain
         { nameof(MnuRename),                new() { new (Keys.F2) } },
         { nameof(MnuMoveToRecycleBin),      new() { new (Keys.Delete) } },
         { nameof(MnuDeleteFromHardDisk),    new() { new (Keys.Shift | Keys.Delete) } },
-        { nameof(MnuStartStopAnimating),    new() { new (Keys.Control | Keys.Space) } },
-        { nameof(MnuExtractFrames),         new() { new (Keys.Control | Keys.J) } },
+        { nameof(MnuToggleImageAnimation),  new() { new (Keys.Control | Keys.Space) } },
+        { nameof(MnuExportFrames),         new() { new (Keys.Control | Keys.J) } },
         { nameof(MnuOpenLocation),          new() { new (Keys.L) } },
         { nameof(MnuImageProperties),       new() { new (Keys.Control | Keys.I) } },
 
         // MnuClipboard
-        { nameof(MnuCopyImageData),         new() { new (Keys.Control | Keys.Shift | Keys.C) } },   // MK2k: use Ctrl+C to copy the file (not the content)
+        { nameof(MnuCopyImageData),         new() { new (Keys.Control | Keys.Shift | Keys.C) } },   // MK2k: use Shift+Ctrl+C to copy the image content
         { nameof(MnuCopy),                  new() { new (Keys.Control | Keys.C) } },                // MK2k: use Ctrl+C to copy the file (not the content)
-        { nameof(MnuCut),                   new() { new (Keys.Control | Keys.X) } },
+        { nameof(MnuCopyFile),              new() { new (Keys.Control | Keys.Shift | Keys.C) } },   // MK2k: use Ctrl+C to copy the file (not the content)
+        // { nameof(MnuCut),                   new() { new (Keys.Control | Keys.X) } },                // MK2k: use Ctrl+X to cut the file (not the content)
+        { nameof(MnuCutFile),               new() { new (Keys.Control | Keys.X) } },                // MK2k: use Ctrl+X to cut the file (not the content)
         { nameof(MnuCopyPath),              new() { new (Keys.Control | Keys.L) } },
         { nameof(MnuClearClipboard),        new() { new (Keys.Control | Keys.Oemtilde) } }, // Ctrl+`
 
@@ -129,7 +130,6 @@ public partial class FrmMain
         { nameof(MnuColorPicker),           new() { new (Keys.K) } },
         { nameof(MnuCropTool),              new() { new (Keys.C) } },
         { nameof(MnuPageNav),               new() { new (Keys.P) } },
-        { nameof(MnuExifTool),              new() { new (Keys.X) } },
 
         // MnuHelp
         { nameof(MnuAbout),                 new() { new (Keys.F1) } },
@@ -142,19 +142,14 @@ public partial class FrmMain
     private void SetUpFrmMainConfigs()
     {
         SuspendLayout();
-        Sp1.TabStop = false;
-        Sp2.Panel2Collapsed = true;
-        Sp2.TabStop = false;
-
 
         // Toolbar
-        Toolbar.Alignment = Config.CenterToolbar
+        Toolbar.Alignment = Config.EnableCenterToolbar
             ? ToolbarAlignment.Center
             : ToolbarAlignment.Left;
 
         Toolbar.ClearItems();
         Toolbar.AddItems(Config.ToolbarItems);
-        IG_ToggleToolbar(Config.ShowToolbar);
 
 
         // Thumbnail bar
@@ -162,7 +157,6 @@ public partial class FrmMain
         Gallery.PersistentCacheSize = Config.ThumbnailCacheSizeInMb;
         Gallery.PersistentCacheDirectory = App.ConfigDir(PathType.Dir, Dir.ThumbnailsCache);
         Gallery.EnableKeyNavigation = false;
-        IG_ToggleGallery(Config.ShowThumbnails);
 
 
         // PicMain
@@ -184,6 +178,9 @@ public partial class FrmMain
 
         IG_ToggleCheckerboard(Config.ShowCheckerBoard);
 
+        // set up layout
+        ApplyAppLayout();
+
         ResumeLayout(false);
 
         Load += FrmMainConfig_Load;
@@ -194,7 +191,7 @@ public partial class FrmMain
 
     private void FrmMainConfig_Load(object? sender, EventArgs e)
     {
-        Local.OnRequestUpdateFrmMain += Local_OnFrmMainUpdateRequested;
+        Local.RequestUpdateFrmMain += Local_FrmMainUpdateRequested;
 
         // IsWindowAlwaysOnTop
         IG_ToggleTopMost(Config.EnableWindowTopMost, showInAppMessage: false);
@@ -202,7 +199,8 @@ public partial class FrmMain
         // load language pack
         Local.UpdateFrmMain(UpdateRequests.Language);
 
-        // load menu hotkeys
+        // load menu
+        LoadExternalTools();
         Config.MergeHotkeys(ref CurrentMenuHotkeys, Config.MenuHotkeys);
         Local.UpdateFrmMain(UpdateRequests.MenuHotkeys);
 
@@ -243,11 +241,17 @@ public partial class FrmMain
         Local.UpdateFrmMain(UpdateRequests.MouseActions);
 
 
-        // make sure all other painting are done before showing the root layout
-        Application.DoEvents();
+        // toggle toolbar
+        IG_ToggleToolbar(Config.ShowToolbar);
 
-        // display the root layout after the window shown
-        Tb0.Visible = true;
+        // toggle gallery
+        IG_ToggleGallery(Config.ShowThumbnails);
+
+        // toggle frameless window
+        IG_ToggleFrameless(Config.EnableFrameless, false);
+
+        // toggle Window fit
+        IG_ToggleWindowFit(Config.EnableWindowFit, false);
 
 
         // update tag data for zoom mode menus
@@ -257,6 +261,25 @@ public partial class FrmMain
         MnuScaleToHeight.Tag = new ModernMenuItemTag() { SingleSelect = true };
         MnuScaleToFit.Tag = new ModernMenuItemTag() { SingleSelect = true };
         MnuScaleToFill.Tag = new ModernMenuItemTag() { SingleSelect = true };
+
+
+        // Make form movable
+        #region Make form movable
+        _movableForm = new(this)
+        {
+            Key = Keys.ShiftKey | Keys.Shift,
+            FreeMoveControlNames = new HashSet<string>()
+            {
+                nameof(Toolbar),
+            },
+        };
+
+
+        // Enable frameless movable
+        _movableForm.Enable();
+        _movableForm.Enable(PicMain, Toolbar);
+        #endregion
+
     }
 
 
@@ -316,19 +339,21 @@ public partial class FrmMain
             Config.FrmMainWidth = Size.Width;
             Config.FrmMainHeight = Size.Height;
         }
+
+        UpdateGallerySize();
     }
 
 
     /// <summary>
     /// Processes internal update requests
     /// </summary>
-    private void Local_OnFrmMainUpdateRequested(UpdateRequests e)
+    private void Local_FrmMainUpdateRequested(UpdateRequests e)
     {
         if (e.HasFlag(UpdateRequests.Language))
         {
             LoadLanguage();
         }
-        
+
         if (e.HasFlag(UpdateRequests.MenuHotkeys))
         {
             LoadMenuHotkeys();
@@ -354,7 +379,7 @@ public partial class FrmMain
                     executable = action.Executable.Trim();
                 }
             }
-            
+
 
             // set context menu = MnuContext
             if (executable == nameof(IG_OpenContextMenu))
@@ -527,8 +552,8 @@ public partial class FrmMain
         MnuRename.Text = lang[$"{Name}.{nameof(MnuRename)}"];
         MnuMoveToRecycleBin.Text = lang[$"{Name}.{nameof(MnuMoveToRecycleBin)}"];
         MnuDeleteFromHardDisk.Text = lang[$"{Name}.{nameof(MnuDeleteFromHardDisk)}"];
-        MnuExtractFrames.Text = lang[$"{Name}.{nameof(MnuExtractFrames)}"];
-        MnuStartStopAnimating.Text = lang[$"{Name}.{nameof(MnuStartStopAnimating)}"];
+        MnuExportFrames.Text = lang[$"{Name}.{nameof(MnuExportFrames)}"];
+        MnuToggleImageAnimation.Text = lang[$"{Name}.{nameof(MnuToggleImageAnimation)}"];
         MnuSetDesktopBackground.Text = lang[$"{Name}.{nameof(MnuSetDesktopBackground)}"];
         MnuSetLockScreen.Text = lang[$"{Name}.{nameof(MnuSetLockScreen)}"];
         MnuOpenLocation.Text = lang[$"{Name}.{nameof(MnuOpenLocation)}"];
@@ -546,9 +571,9 @@ public partial class FrmMain
         #region Menu Clipboard
         MnuClipboard.Text = lang[$"{Name}.{nameof(MnuClipboard)}"];
 
-        MnuCopy.Text = lang[$"{Name}.{nameof(MnuCopy)}"];
+        MnuCopyFile.Text = lang[$"{Name}.{nameof(MnuCopyFile)}"];
         MnuCopyImageData.Text = lang[$"{Name}.{nameof(MnuCopyImageData)}"];
-        MnuCut.Text = lang[$"{Name}.{nameof(MnuCut)}"];
+        MnuCutFile.Text = lang[$"{Name}.{nameof(MnuCutFile)}"];
         MnuCopyPath.Text = lang[$"{Name}.{nameof(MnuCopyPath)}"];
         MnuClearClipboard.Text = lang[$"{Name}.{nameof(MnuClearClipboard)}"];
         #endregion
@@ -589,7 +614,14 @@ public partial class FrmMain
         MnuColorPicker.Text = lang[$"{Name}.{nameof(MnuColorPicker)}"];
         MnuPageNav.Text = lang[$"{Name}.{nameof(MnuPageNav)}"];
         MnuCropTool.Text = lang[$"{Name}.{nameof(MnuCropTool)}"];
-        MnuExifTool.Text = lang[$"{Name}.{nameof(MnuExifTool)}"];
+
+        foreach (var item in MnuTools.DropDownItems)
+        {
+            if (item is not ToolStripMenuItem mnuItem) continue;
+            if (!Config.Language.TryGetValue($"_.Tools.{mnuItem.Name}", out var toolDisplayName)) continue;
+
+            mnuItem.Text = toolDisplayName;
+        }
         #endregion
 
 
@@ -836,6 +868,90 @@ public partial class FrmMain
     }
 
 
+    /// <summary>
+    /// Load external tools to MnuTools.
+    /// </summary>
+    private void LoadExternalTools()
+    {
+        // clear external tools
+        foreach (ToolStripItem item in MnuTools.DropDownItems)
+        {
+            if (item.Name.Equals(nameof(MnuColorPicker))
+                || item.Name.Equals(nameof(MnuCropTool))
+                || item.Name.Equals(nameof(MnuPageNav))) continue;
+
+            item.Click -= MnuExternalTool_Click;
+            MnuTools.DropDownItems.Remove(item);
+        }
+
+        // add separator to separate built-in and external tools
+        if (Config.Tools.Count > 0)
+        {
+            MnuTools.DropDownItems.Add(new ToolStripSeparator());
+        }
+
+        var newMenuIconHeight = this.ScaleToDpi(Constants.MENU_ICON_HEIGHT);
+
+        // add external tools
+        foreach (var item in Config.Tools)
+        {
+            _ = Config.Language.TryGetValue($"_.Tools.{item.ToolId}", out var toolName);
+
+            var mnu = new ToolStripMenuItem()
+            {
+                Name = item.ToolId,
+                Text = toolName ?? item.ToolName ?? item.ToolId,
+                CheckOnClick = item.CanToggle ?? false,
+                Checked = false,
+                ImageScaling = ToolStripItemImageScaling.None,
+                Image = new Bitmap(newMenuIconHeight, newMenuIconHeight),
+            };
+
+            mnu.Click += MnuExternalTool_Click;
+            MnuTools.DropDownItems.Add(mnu);
+        }
+    }
+
+
+    private void MnuExternalTool_Click(object? sender, EventArgs e)
+    {
+        if (sender is not ToolStripMenuItem mnu
+            || Config.Tools.SingleOrDefault(i => i.ToolId.Equals(mnu.Name)) is not IgTool tool) return;
+
+
+        // Tool not found
+        if (tool.IsEmpty)
+        {
+            using var frm = new FrmToolNotFound(tool.ToolId);
+            var result = frm.ShowDialog(this);
+
+            if (result != DialogResult.OK)
+            {
+                if (mnu.CheckOnClick) mnu.Checked = !mnu.Checked;
+                return;
+            }
+
+            tool.Executable = frm.ExecutablePath;
+        }
+
+
+        var visible = !mnu.Checked;
+        if (mnu.CheckOnClick)
+        {
+            visible = mnu.Checked;
+        }
+
+        if (visible)
+        {
+            _ = Local.OpenPipedToolAsync(tool);
+        }
+        else
+        {
+            _ = Local.ClosePipedToolAsync(tool);
+        }
+    }
+
+
     private void HideUnreadyMenuItems()
     {
         // MnuFile
@@ -844,7 +960,7 @@ public partial class FrmMain
         //MnuSave.Visible = false;
         //MnuSaveAs.Visible = false;
         //MnuOpenWith.Visible = false;
-        MnuEdit.Visible = false;
+        //MnuEdit.Visible = false;
         //MnuPrint.Visible = false;
         // MnuPrint.Visible = false;
         //MnuRefresh.Visible = false;
@@ -879,16 +995,16 @@ public partial class FrmMain
         //MnuViewChannels.Visible = false;
         //MnuLoadingOrders.Visible = false;
         //toolStripMenuItem16.Visible = false;
-        MnuRotateLeft.Visible = false;
-        MnuRotateRight.Visible = false;
+        //MnuRotateLeft.Visible = false;
+        //MnuRotateRight.Visible = false;
         //MnuFlipHorizontal.Visible = false;
         //MnuFlipVertical.Visible = false;
         //toolStripMenuItem17.Visible = false;
         //MnuRename.Visible = false;
         //MnuMoveToRecycleBin.Visible = false;
         //MnuDeleteFromHardDisk.Visible = false;
-        MnuStartStopAnimating.Visible = false;
-        MnuExtractFrames.Visible = false;
+        //MnuToggleImageAnimation.Visible = false;
+        //MnuExportFrames.Visible = false;
         //MnuSetDesktopBackground.Visible = false;
         //MnuSetLockScreen.Visible = false;
         //MnuOpenLocation.Visible = false;
@@ -898,13 +1014,13 @@ public partial class FrmMain
         //MnuPasteImage.Visible = false;
         //MnuCopyImageData.Visible = false;
         //MnuCopyPath.Visible = false;
-        //MnuCopy.Visible = false;
-        //MnuCut.Visible = false;
+        //MnuCopyFile.Visible = false;
+        //MnuCutFile.Visible = false;
         //MnuClearClipboard.Visible = false;
 
         //toolStripMenuItem6.Visible = false;
-        MnuWindowFit.Visible = false;
-        MnuFrameless.Visible = false;
+        //MnuWindowFit.Visible = false;
+        //MnuFrameless.Visible = false;
         //MnuFullScreen.Visible = false;
 
         // MnuSlideshow
@@ -920,10 +1036,10 @@ public partial class FrmMain
 
         // MnuTools
         //MnuTools.Visible = false;
-        MnuColorPicker.Visible = false;
+        //MnuColorPicker.Visible = false;
         //MnuCropTool.Visible = false;
         MnuPageNav.Visible = false;
-        MnuExifTool.Visible = false;
+        //MnuExifTool.Visible = false;
 
         // MnuHelp
         //MnuAbout.Visible = false;
@@ -933,6 +1049,122 @@ public partial class FrmMain
 
         //MnuSettings.Visible = false;
         //MnuExit.Visible = false;
+    }
+
+
+    private void UpdateEditAppInfoForMenu()
+    {
+        var appName = string.Empty;
+        MnuEdit.Image = null;
+
+        // not clipboard image
+        if (Local.ClipboardImage == null)
+        {
+            // Find file format
+            var ext = Path.GetExtension(Local.Images.GetFilePath(Local.CurrentIndex)).ToLowerInvariant();
+
+            if (Config.EditApps.TryGetValue(ext, out var app) && app != null)
+            {
+                appName = $"({app.AppName})";
+
+                try
+                {
+                    // update menu icon
+                    using var ico = Icon.ExtractAssociatedIcon(app.Executable);
+                    var iconWidth = this.ScaleToDpi(Constants.MENU_ICON_HEIGHT);
+
+                    MnuEdit.Image = new Bitmap(ico.ToBitmap(), iconWidth, iconWidth);
+                }
+                catch { }
+            }
+            else if (BHelper.IsOS(WindowsOS.Win11OrLater))
+            {
+                appName = "(MS Paint)";
+            }
+        }
+
+        MnuEdit.Text = string.Format(Config.Language[$"{Name}.{nameof(MnuEdit)}"], appName);
+    }
+
+
+    /// <summary>
+    /// Makes app layout changes according to <see cref="Config.Layout"/>.
+    /// </summary>
+    private void ApplyAppLayout()
+    {
+        const string SEPARATOR = ";";
+
+        // load Toolbar layout setting
+        var toolbarDock = DockStyle.Top;
+        var toolbarDockingOrder = 0;
+        if (Config.Layout.TryGetValue(nameof(Toolbar), out var toolbarLayoutStr))
+        {
+            var options = toolbarLayoutStr?.Split(SEPARATOR, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (options?.Length > 1)
+            {
+                _ = int.TryParse(options[1], out toolbarDockingOrder);
+            }
+            if (options?.Length > 0)
+            {
+                toolbarDock = BHelper.ConvertType<DockStyle>(options[0], toolbarDock);
+            }
+        }
+
+
+        // load Gallery layout setting
+        var galleryDock = DockStyle.Bottom;
+        var galleryDockingOrder = 0;
+        if (Config.Layout.TryGetValue(nameof(Gallery), out var galleryLayoutStr))
+        {
+            var options = galleryLayoutStr?.Split(SEPARATOR, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+
+            if (options?.Length > 1)
+            {
+                _ = int.TryParse(options[1], out galleryDockingOrder);
+            }
+            if (options?.Length > 0)
+            {
+                galleryDock = BHelper.ConvertType<DockStyle>(options[0], galleryDock);
+            }
+        }
+
+
+        // update layout
+        #region update layout
+        SuspendLayout();
+
+        // update position
+        Toolbar.Dock = toolbarDock;
+        Gallery.Dock = galleryDock;
+        if (galleryDock == DockStyle.Left || galleryDock == DockStyle.Right)
+        {
+            Gallery.View = ImageGlass.Gallery.View.Thumbnails;
+            Gallery.ScrollBars = true;
+        }
+        else
+        {
+            Gallery.ScrollBars = Config.ShowThumbnailScrollbars || Gallery.View == ImageGlass.Gallery.View.Thumbnails;
+        }
+        UpdateGallerySize();
+
+
+        // update docking order
+        if (toolbarDockingOrder <= galleryDockingOrder)
+        {
+            Toolbar.SendToBack();
+        }
+        else
+        {
+            Gallery.SendToBack();
+        }
+
+        // make sure PicMain always on top
+        PicMain.BringToFront();
+
+        ResumeLayout(false);
+        #endregion // update layout
+
     }
 
 }

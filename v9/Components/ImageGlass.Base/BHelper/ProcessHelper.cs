@@ -18,7 +18,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 // Source:
-// https://github.com/aspnet/AspNetIdentity/blob/main/src/Microsoft.AspNet.Identity.Core/AsyncHelper.cs
+// https://github.com/aspnet/AspNetIdentity/blob/b7826741279450c58b230ece98bd04b4815beabf/src/Microsoft.AspNet.Identity.Core/AsyncHelper.cs
 
 using System.Diagnostics;
 using System.Globalization;
@@ -32,11 +32,9 @@ public partial class BHelper
         TaskContinuationOptions.None, TaskScheduler.Default);
 
     /// <summary>
-    /// Runs an async function synchronous
+    /// Runs an async function synchronous.
+    /// Source: <see href="https://github.com/aspnet/AspNetIdentity/blob/b7826741279450c58b230ece98bd04b4815beabf/src/Microsoft.AspNet.Identity.Core/AsyncHelper.cs" />
     /// </summary>
-    /// <typeparam name="TResult"></typeparam>
-    /// <param name="func"></param>
-    /// <returns></returns>
     public static TResult RunSync<TResult>(Func<Task<TResult>> func)
     {
         var cultureUi = CultureInfo.CurrentUICulture;
@@ -52,9 +50,9 @@ public partial class BHelper
 
 
     /// <summary>
-    /// Runs an async function synchronous
+    /// Runs an async function synchronous.
+    /// Source: <see href="https://github.com/aspnet/AspNetIdentity/blob/b7826741279450c58b230ece98bd04b4815beabf/src/Microsoft.AspNet.Identity.Core/AsyncHelper.cs" />
     /// </summary>
-    /// <param name="func"></param>
     public static void RunSync(Func<Task> func)
     {
         var cultureUi = CultureInfo.CurrentUICulture;
@@ -72,8 +70,6 @@ public partial class BHelper
     /// <summary>
     /// Runs a function in a new thread
     /// </summary>
-    /// <param name="func"></param>
-    /// <returns></returns>
     public static Thread RunAsThread(ThreadStart func, ApartmentState thState = ApartmentState.Unknown)
     {
         var th = new Thread(func)
@@ -91,8 +87,6 @@ public partial class BHelper
     /// <summary>
     /// Runs as admin
     /// </summary>
-    /// <param name="filename"></param>
-    /// <param name="args"></param>
     public static async Task<int> RunExeAsync(string filename, string args, bool asAdmin = false, bool waitForExit = false)
     {
         var proc = new Process();

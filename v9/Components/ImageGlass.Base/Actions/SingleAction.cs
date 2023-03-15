@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -44,13 +44,13 @@ public class SingleAction
     /// </summary>
     public string Executable { get; set; } = string.Empty;
 
-    
+
     /// <summary>
     /// Argument to pass to the <see cref="Executable"/>.
     /// </summary>
     public object Argument { get; set; } = string.Empty;
 
-    
+
     /// <summary>
     /// Next action to execute after running <see cref="Executable"/>.
     /// </summary>
@@ -72,5 +72,5 @@ public class SingleAction
         Argument = arguments.Trim();
         NextAction = nextAction;
     }
-    
+
 }

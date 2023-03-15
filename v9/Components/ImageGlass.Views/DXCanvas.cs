@@ -24,7 +24,6 @@ using ImageGlass.Base.Photoing.Codecs;
 using ImageGlass.Base.WinApi;
 using ImageGlass.Views.ImageAnimator;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Drawing.Drawing2D;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -39,7 +38,7 @@ public class DXCanvas : DXControl
     // Private properties
     #region Private properties
 
-    private IComObject<ID2D1Bitmap>? _imageD2D = null;
+    private IComObject<ID2D1Bitmap1>? _imageD2D = null;
     private Bitmap? _imageGdiPlus = null;
     private CancellationTokenSource? _msgTokenSrc;
 
@@ -93,25 +92,29 @@ public class DXCanvas : DXControl
     private Color _checkerboardColor1 = Color.Black.WithAlpha(25);
     private Color _checkerboardColor2 = Color.White.WithAlpha(25);
     private TextureBrush? _checkerboardBrushGdip;
-    private ComObject<ID2D1BitmapBrush>? _checkerboardBrushD2D;
+    private ComObject<ID2D1BitmapBrush1>? _checkerboardBrushD2D;
 
     private IImageAnimator _imageAnimator;
     private AnimationSource _animationSource = AnimationSource.None;
     private bool _shouldRecalculateDrawingRegion = true;
 
     // Navigation buttons
-    private const float NAV_PADDING = 20f;
+    internal float NAV_PADDING => 20f;
     private bool _isNavLeftHovered = false;
     private bool _isNavLeftPressed = false;
     private bool _isNavRightHovered = false;
     private bool _isNavRightPressed = false;
-    internal PointF NavLeftPos => new(NavButtonSize.Width / 2 + NAV_PADDING, Height / 2);
-    internal PointF NavRightPos => new(Width - NavButtonSize.Width / 2 - NAV_PADDING, Height / 2);
+    internal PointF NavLeftPos => new(
+        DrawingArea.Left + NavButtonSize.Width / 2 + NAV_PADDING,
+        DrawingArea.Top + DrawingArea.Height / 2);
+    internal PointF NavRightPos => new(
+        DrawingArea.Right - NavButtonSize.Width / 2 - NAV_PADDING,
+        DrawingArea.Top + DrawingArea.Height / 2);
     private NavButtonDisplay _navDisplay = NavButtonDisplay.None;
     private bool _isNavVisible = false;
     private float NavBorderRadius => NavButtonSize.Width / 2;
-    private IComObject<ID2D1Bitmap>? _navLeftImage = null;
-    private IComObject<ID2D1Bitmap>? _navRightImage = null;
+    private IComObject<ID2D1Bitmap1>? _navLeftImage = null;
+    private IComObject<ID2D1Bitmap1>? _navRightImage = null;
     private Bitmap? _navLeftImageGdip = null;
     private Bitmap? _navRightImageGdip = null;
 
@@ -133,6 +136,76 @@ public class DXCanvas : DXControl
 
     // Viewport
     #region Viewport
+
+    /// <summary>
+    /// Gets, sets the left padding.
+    /// </summary>
+    [Browsable(false)]
+    public int PaddingLeft
+    {
+        get => Padding.Left;
+        set
+        {
+            Padding = new Padding(value, Padding.Top, Padding.Right, Padding.Bottom);
+            _shouldRecalculateDrawingRegion = true;
+            Refresh(!_isManualZoom);
+        }
+    }
+
+    /// <summary>
+    /// Gets, sets the top padding.
+    /// </summary>
+    [Browsable(false)]
+    public int PaddingTop
+    {
+        get => Padding.Top;
+        set
+        {
+            Padding = new Padding(Padding.Left, value, Padding.Right, Padding.Bottom);
+            _shouldRecalculateDrawingRegion = true;
+            Refresh(!_isManualZoom);
+        }
+    }
+
+    /// <summary>
+    /// Gets, sets the right padding.
+    /// </summary>
+    [Browsable(false)]
+    public int PaddingRight
+    {
+        get => Padding.Right;
+        set
+        {
+            Padding = new Padding(Padding.Left, Padding.Top, value, Padding.Bottom);
+            _shouldRecalculateDrawingRegion = true;
+            Refresh(!_isManualZoom);
+        }
+    }
+
+    /// <summary>
+    /// Gets, sets the bottom padding.
+    /// </summary>
+    [Browsable(false)]
+    public int PaddingBottom
+    {
+        get => Padding.Bottom;
+        set
+        {
+            Padding = new Padding(Padding.Left, Padding.Top, Padding.Right, value);
+            _shouldRecalculateDrawingRegion = true;
+            Refresh(!_isManualZoom);
+        }
+    }
+
+    /// <summary>
+    /// Gets the drawing area after deducting <see cref="Padding"/>.
+    /// </summary>
+    [Browsable(false)]
+    public RectangleF DrawingArea => new RectangleF(
+        Padding.Left,
+        Padding.Top,
+        Width - Padding.Horizontal,
+        Height - Padding.Vertical);
 
     /// <summary>
     /// Gets rectangle of the viewport.
@@ -167,7 +240,7 @@ public class DXCanvas : DXControl
     {
         get
         {
-            if (_destRect.X > 0 && _destRect.Y > 0) return true;
+            if (_destRect.X > DrawingArea.Left && _destRect.Y > DrawingArea.Top) return true;
 
 
             if (SourceWidth > SourceHeight)
@@ -185,6 +258,7 @@ public class DXCanvas : DXControl
     /// <summary>
     /// Gets the drawing state of the image source
     /// </summary>
+    [Browsable(false)]
     public ImageDrawingState ImageDrawingState => _imageDrawingState;
 
 
@@ -212,7 +286,7 @@ public class DXCanvas : DXControl
             value.Intersect(_destRect);
             _clientSelection = value;
 
-            SelectionChanged?.Invoke(new SelectionEventArgs(_clientSelection, SourceSelection));
+            SelectionChanged?.Invoke(this, new SelectionEventArgs(_clientSelection, SourceSelection));
         }
     }
 
@@ -323,7 +397,7 @@ public class DXCanvas : DXControl
                 resizerSize, resizerSize);
             var bottomRightHit = new RectangleF(
                 ClientSelection.Right - hitSize / 2 - resizerSize / 2,
-                ClientSelection.Bottom  - hitSize / 2 - resizerSize / 2,
+                ClientSelection.Bottom - hitSize / 2 - resizerSize / 2,
                 hitSize, hitSize);
 
             // top
@@ -389,7 +463,7 @@ public class DXCanvas : DXControl
     /// </summary>
     public SizeF SelectionAspectRatio { get; set; } = new();
 
-    
+
     /// <summary>
     /// Enables or disables the selection.
     /// </summary>
@@ -399,7 +473,7 @@ public class DXCanvas : DXControl
         set
         {
             _enableSelection = value;
-            if (!_enableSelection)
+            if (!_enableSelection && Parent != null)
             {
                 Cursor = Parent.Cursor;
             }
@@ -478,32 +552,18 @@ public class DXCanvas : DXControl
 
     /// <summary>
     /// Gets, sets current zoom factor (<c>1.0f = 100%</c>).
+    /// This also sets <see cref="_isManualZoom"/> to <c>true</c>.
+    /// 
+    /// <para>
+    /// Use <see cref="SetZoomFactor(float, bool)"/> for more options.
+    /// </para>
     /// </summary>
     [Category("Zooming")]
     [DefaultValue(1.0f)]
     public float ZoomFactor
     {
         get => _zoomFactor;
-        set
-        {
-            if (_zoomFactor != value)
-            {
-                _zoomFactor = Math.Min(MaxZoom, Math.Max(value, MinZoom));
-
-                _isManualZoom = true;
-                _shouldRecalculateDrawingRegion = true;
-
-                Invalidate();
-
-                OnZoomChanged?.Invoke(new(_zoomFactor));
-
-                // emit selecting event
-                if (EnableSelection && !ClientSelection.IsEmpty)
-                {
-                    SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
-                }
-            }
-        }
+        set => SetZoomFactor(value, true);
     }
 
     /// <summary>
@@ -584,12 +644,6 @@ public class DXCanvas : DXControl
     [Browsable(false)]
     public ImageInterpolation CurrentInterpolation => ZoomFactor > 1f ? _interpolationScaledUp : _interpolationScaleDown;
 
-
-    /// <summary>
-    /// Occurs when <see cref="ZoomFactor"/> value changes.
-    /// </summary>
-    public event ZoomChangedEventHandler? OnZoomChanged = null;
-    public delegate void ZoomChangedEventHandler(ZoomEventArgs e);
 
     #endregion
 
@@ -788,22 +842,6 @@ public class DXCanvas : DXControl
         }
     }
 
-
-    /// <summary>
-    /// Occurs when the left navigation button clicked.
-    /// </summary>
-    [Category("Navigation")]
-    public event NavLeftClickedEventHandler? OnNavLeftClicked = null;
-    public delegate void NavLeftClickedEventHandler(MouseEventArgs e);
-
-
-    /// <summary>
-    /// Occurs when the right navigation button clicked.
-    /// </summary>
-    [Category("Navigation")]
-    public event NavRightClickedEventHandler? OnNavRightClicked = null;
-    public delegate void NavRightClickedEventHandler(MouseEventArgs e);
-
     #endregion
 
 
@@ -854,45 +892,62 @@ public class DXCanvas : DXControl
     #region Events
 
     /// <summary>
+    /// Occurs when <see cref="ZoomFactor"/> value changes.
+    /// </summary>
+    public event EventHandler<ZoomEventArgs>? OnZoomChanged = null;
+
+    /// <summary>
     /// Occurs when the host is being panned.
     /// </summary>
-    public event PanningEventHandler? Panning;
-    public delegate void PanningEventHandler(PanningEventArgs e);
+    public event EventHandler<PanningEventArgs>? Panning;
 
 
     /// <summary>
     /// Occurs when the image is being loaded.
     /// </summary>
-    public event ImageLoadingEventHandler? ImageLoading;
-    public delegate void ImageLoadingEventHandler();
+    public event EventHandler? ImageLoading;
 
 
     /// <summary>
     /// Occurs when the image is drawn adn its animation, preview finished.
     /// </summary>
-    public event ImageLoadedEventHandler? ImageLoaded;
-    public delegate void ImageLoadedEventHandler();
+    public event EventHandler? ImageLoaded;
 
 
     /// <summary>
     /// Occurs when the image is drawn to the canvas.
     /// </summary>
-    public event ImageDrawnEventHandler? ImageDrawn;
-    public delegate void ImageDrawnEventHandler();
+    public event EventHandler? ImageDrawn;
 
 
     /// <summary>
-    /// Occurs when the mouse pointer is moved over the control
+    /// Occurs when the mouse pointer is moved over the control.
     /// </summary>
-    public event ImageMouseMoveEventHandler? ImageMouseMove;
-    public delegate void ImageMouseMoveEventHandler(ImageMouseMoveEventArgs e);
+    public event EventHandler<ImageMouseEventArgs>? ImageMouseMove;
+
+
+    /// <summary>
+    /// Occurs when the control is clicked by the mouse.
+    /// </summary>
+    public event EventHandler<ImageMouseEventArgs>? ImageMouseClick;
 
 
     /// <summary>
     /// Occurs when the <see cref="ClientSelection"/> is changed.
     /// </summary>
-    public event SelectionChangedEventHandler? SelectionChanged;
-    public delegate void SelectionChangedEventHandler(SelectionEventArgs e);
+    public event EventHandler<SelectionEventArgs>? SelectionChanged;
+
+
+    /// <summary>
+    /// Occurs when the left navigation button clicked.
+    /// </summary>
+    public event EventHandler<MouseEventArgs>? OnNavLeftClicked;
+
+
+    /// <summary>
+    /// Occurs when the right navigation button clicked.
+    /// </summary>
+    public event EventHandler<MouseEventArgs>? OnNavRightClicked;
 
 
     #endregion
@@ -986,20 +1041,20 @@ public class DXCanvas : DXControl
 
         var canSelect = EnableSelection && _mouseDownButton == MouseButtons.Left;
         var requestRerender = false;
-        
+
 
         // Navigation clickable check
         #region Navigation clickable check
         if (e.Button == MouseButtons.Left)
         {
             // calculate whether the point inside the left nav
-            if (this.CheckWhichNav(e.Location, true) == MouseAndNavLocation.LeftNav)
+            if (this.CheckWhichNav(e.Location, NavCheck.LeftOnly) == MouseAndNavLocation.LeftNav)
             {
                 _isNavLeftPressed = true;
             }
 
             // calculate whether the point inside the right nav
-            if (this.CheckWhichNav(e.Location, false) == MouseAndNavLocation.RightNav)
+            if (this.CheckWhichNav(e.Location, NavCheck.RightOnly) == MouseAndNavLocation.RightNav)
             {
                 _isNavRightPressed = true;
             }
@@ -1044,7 +1099,7 @@ public class DXCanvas : DXControl
             // panning
             else
             {
-                
+
                 _panHostToPoint.X = e.Location.X;
                 _panHostToPoint.Y = e.Location.Y;
                 _panHostFromPoint.X = e.Location.X;
@@ -1095,6 +1150,12 @@ public class DXCanvas : DXControl
                 _isDoubleClick = true;
                 _doubleClickArea = new(e.Location - (SystemInformation.DoubleClickSize / 2), SystemInformation.DoubleClickSize);
             }
+
+
+            // emit event ImageMouseClick
+            var imgX = (e.X - _destRect.X) / _zoomFactor + _srcRect.X;
+            var imgY = (e.Y - _destRect.Y) / _zoomFactor + _srcRect.Y;
+            ImageMouseClick?.Invoke(this, new(imgX, imgY, e.Button));
         }
         #endregion
 
@@ -1106,17 +1167,17 @@ public class DXCanvas : DXControl
             if (_isNavRightPressed)
             {
                 // emit nav button event if the point inside the right nav
-                if (this.CheckWhichNav(e.Location, false) == MouseAndNavLocation.RightNav)
+                if (this.CheckWhichNav(e.Location, NavCheck.RightOnly) == MouseAndNavLocation.RightNav)
                 {
-                    OnNavRightClicked?.Invoke(e);
+                    OnNavRightClicked?.Invoke(this, e);
                 }
             }
             else if (_isNavLeftPressed)
             {
                 // emit nav button event if the point inside the left nav
-                if (this.CheckWhichNav(e.Location, true) == MouseAndNavLocation.LeftNav)
+                if (this.CheckWhichNav(e.Location, NavCheck.LeftOnly) == MouseAndNavLocation.LeftNav)
                 {
-                    OnNavLeftClicked?.Invoke(e);
+                    OnNavLeftClicked?.Invoke(this, e);
                 }
             }
         }
@@ -1135,7 +1196,7 @@ public class DXCanvas : DXControl
         var canSelect = EnableSelection && mouseDownButton == MouseButtons.Left;
         if (canSelect)
         {
-            SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+            SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
             Invalidate();
         }
     }
@@ -1157,33 +1218,11 @@ public class DXCanvas : DXControl
         // no button pressed
         if (e.Button == MouseButtons.None)
         {
-            // left hoverable region
-            if (NavDisplay == NavButtonDisplay.Left
-                || NavDisplay == NavButtonDisplay.Both)
-            {
-                var leftHoverable = new RectangleF(
-                NavLeftPos.X - NavButtonSize.Width / 2 - NAV_PADDING,
-                NavLeftPos.Y - NavButtonSize.Height / 2 * 3,
-                NavButtonSize.Width + NAV_PADDING,
-                NavButtonSize.Height * 3);
+            // calculate whether the point inside the left nav
+            _isNavLeftHovered = this.CheckWhichNav(e.Location, NavCheck.LeftOnly) == MouseAndNavLocation.LeftNav;
 
-                // calculate whether the point inside the rect
-                _isNavLeftHovered = leftHoverable.Contains(e.Location);
-            }
-
-            // right hoverable region
-            if (NavDisplay == NavButtonDisplay.Right
-                || NavDisplay == NavButtonDisplay.Both)
-            {
-                var rightHoverable = new RectangleF(
-                NavRightPos.X - NavButtonSize.Width / 2,
-                NavRightPos.Y - NavButtonSize.Height / 2 * 3,
-                NavButtonSize.Width + NAV_PADDING,
-                NavButtonSize.Height * 3);
-
-                // calculate whether the point inside the rect
-                _isNavRightHovered = rightHoverable.Contains(e.Location);
-            }
+            // calculate whether the point inside the right nav
+            _isNavRightHovered = this.CheckWhichNav(e.Location, NavCheck.RightOnly) == MouseAndNavLocation.RightNav;
 
             if (!_isNavLeftHovered && !_isNavRightHovered && _isNavVisible)
             {
@@ -1217,7 +1256,7 @@ public class DXCanvas : DXControl
                 CurrentSelectionAction = SelectionAction.Drawing;
                 UpdateSelectionByMousePosition();
 
-                SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+                SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
                 requestRerender = true;
             }
             // move selection
@@ -1238,10 +1277,10 @@ public class DXCanvas : DXControl
         }
 
 
-        // emit event OnImageMouseMove
+        // emit event ImageMouseMove
         var imgX = (e.X - _destRect.X) / _zoomFactor + _srcRect.X;
         var imgY = (e.Y - _destRect.Y) / _zoomFactor + _srcRect.Y;
-        ImageMouseMove?.Invoke(new(imgX, imgY, e.Button));
+        ImageMouseMove?.Invoke(this, new(imgX, imgY, e.Button));
 
         // change cursor
         if (EnableSelection)
@@ -1384,7 +1423,7 @@ public class DXCanvas : DXControl
         // emits event ImageDrawn
         if (isImageDrawn)
         {
-            ImageDrawn?.Invoke();
+            ImageDrawn?.Invoke(this, EventArgs.Empty);
         }
 
 
@@ -1417,7 +1456,7 @@ public class DXCanvas : DXControl
         if (isImageFinalDrawn)
         {
             _imageDrawingState = ImageDrawingState.Done;
-            ImageLoaded?.Invoke();
+            ImageLoaded?.Invoke(this, EventArgs.Empty);
         }
     }
 
@@ -1487,8 +1526,8 @@ public class DXCanvas : DXControl
         _xOut = false;
         _yOut = false;
 
-        var controlW = Width;
-        var controlH = Height;
+        var controlW = DrawingArea.Width;
+        var controlH = DrawingArea.Height;
         var scaledImgWidth = SourceWidth * _zoomFactor;
         var scaledImgHeight = SourceHeight * _zoomFactor;
 
@@ -1499,7 +1538,7 @@ public class DXCanvas : DXControl
             _srcRect.X = 0;
             _srcRect.Width = SourceWidth;
 
-            _destRect.X = (controlW - scaledImgWidth) / 2.0f;
+            _destRect.X = (controlW - scaledImgWidth) / 2.0f + DrawingArea.Left;
             _destRect.Width = scaledImgWidth;
         }
         else
@@ -1507,7 +1546,7 @@ public class DXCanvas : DXControl
             _srcRect.X += (controlW / _oldZoomFactor - controlW / _zoomFactor) / ((controlW + float.Epsilon) / zoomX);
             _srcRect.Width = controlW / _zoomFactor;
 
-            _destRect.X = 0;
+            _destRect.X = DrawingArea.Left;
             _destRect.Width = controlW;
         }
 
@@ -1518,7 +1557,7 @@ public class DXCanvas : DXControl
             _srcRect.Y = 0;
             _srcRect.Height = SourceHeight;
 
-            _destRect.Y = (controlH - scaledImgHeight) / 2f;
+            _destRect.Y = (controlH - scaledImgHeight) / 2f + DrawingArea.Top;
             _destRect.Height = scaledImgHeight;
         }
         else
@@ -1526,7 +1565,7 @@ public class DXCanvas : DXControl
             _srcRect.Y += (controlH / _oldZoomFactor - controlH / _zoomFactor) / ((controlH + float.Epsilon) / zoomY);
             _srcRect.Height = controlH / _zoomFactor;
 
-            _destRect.Y = 0;
+            _destRect.Y = DrawingArea.Top;
             _destRect.Height = controlH;
         }
 
@@ -1572,7 +1611,8 @@ public class DXCanvas : DXControl
 
         if (UseHardwareAcceleration)
         {
-            g.DrawBitmap(_imageD2D?.Object, _destRect, _srcRect, (InterpolationMode)CurrentInterpolation, _imageOpacity);
+            g.DrawBitmap(_imageD2D, _destRect, _srcRect, (InterpolationMode)CurrentInterpolation, _imageOpacity);
+
         }
         else
         {
@@ -1600,7 +1640,7 @@ public class DXCanvas : DXControl
         }
         else
         {
-            region = ClientRectangle;
+            region = DrawingArea;
         }
 
 
@@ -1610,7 +1650,7 @@ public class DXCanvas : DXControl
             _checkerboardBrushD2D ??= VHelper.CreateCheckerBoxTileD2D(Device, CheckerboardCellSize, CheckerboardColor1, CheckerboardColor2);
 
             // draw checkerboard
-            Device.FillRectangle(DXHelper.ToD2DRectF(region), _checkerboardBrushD2D.Object);
+            Device.FillRectangle(DXHelper.ToD2DRectF(region), _checkerboardBrushD2D);
         }
         else
         {
@@ -1769,15 +1809,15 @@ public class DXCanvas : DXControl
         if (!hasHeading && !hasText) return;
 
         var textMargin = 20;
-        var textPaddingX = textMargin * 2;
-        var textPaddingY = textMargin * 2;
+        var textPaddingX = Padding.Horizontal;
+        var textPaddingY = Padding.Vertical;
         var gap = hasHeading && hasText
             ? textMargin
             : 0;
 
         var drawableArea = new RectangleF(
-            textMargin,
-            textMargin,
+            textPaddingX / 2,
+            textPaddingY / 2,
             Math.Max(0, Width - textPaddingX),
             Math.Max(0, Height - textPaddingY));
 
@@ -1807,7 +1847,7 @@ public class DXCanvas : DXControl
             X = centerX - hTextSize.Width / 2,
             Y = centerY - ((hTextSize.Height + tTextSize.Height) / 2) - gap / 2,
             Width = hTextSize.Width + textPaddingX - drawableArea.X * 2 + 1,
-            Height = hTextSize.Height + textMargin - drawableArea.Y,
+            Height = hTextSize.Height + textPaddingY / 2 - drawableArea.Y,
         };
 
         var tRegion = new RectangleF()
@@ -1815,14 +1855,14 @@ public class DXCanvas : DXControl
             X = centerX - tTextSize.Width / 2,
             Y = centerY - ((hTextSize.Height + tTextSize.Height) / 2) + hTextSize.Height + gap / 2,
             Width = tTextSize.Width + textPaddingX - drawableArea.X * 2 + 1,
-            Height = tTextSize.Height + textMargin - drawableArea.Y,
+            Height = tTextSize.Height + textPaddingY / 2 - drawableArea.Y,
         };
 
         var bgRegion = new RectangleF()
         {
             X = Math.Min(tRegion.X, hRegion.X) - textMargin / 2,
             Y = Math.Min(tRegion.Y, hRegion.Y) - textMargin / 2,
-            Width = Math.Max(tRegion.Width, hRegion.Width) + textPaddingX / 2,
+            Width = Math.Max(tRegion.Width, hRegion.Width) + textMargin,
             Height = tRegion.Height + hRegion.Height + textMargin + gap,
         };
 
@@ -1905,7 +1945,7 @@ public class DXCanvas : DXControl
                 SizeF srcIconSize;
                 if (UseHardwareAcceleration && _navLeftImage != null)
                 {
-                    bmpObj = _navLeftImage.Object;
+                    bmpObj = _navLeftImage;
                     _navLeftImage.Object.GetSize(out var size);
 
                     srcIconSize = DXHelper.ToSize(size);
@@ -1972,7 +2012,7 @@ public class DXCanvas : DXControl
                 SizeF srcIconSize;
                 if (UseHardwareAcceleration && _navRightImage != null)
                 {
-                    bmpObj = _navRightImage.Object;
+                    bmpObj = _navRightImage;
                     _navRightImage.Object.GetSize(out var size);
 
                     srcIconSize = DXHelper.ToSize(size);
@@ -2008,16 +2048,17 @@ public class DXCanvas : DXControl
         if (!IsReady || Source == ImageSource.Null) return;
 
         // get zoom factor after applying the zoom mode
-        _zoomFactor = CalculateZoomFactor(mode ?? _zoomMode, SourceWidth, SourceHeight);
+        var zoomMode = mode ?? _zoomMode;
+        _zoomFactor = CalculateZoomFactor(zoomMode, SourceWidth, SourceHeight, Width, Height);
         _isManualZoom = false;
         _shouldRecalculateDrawingRegion = true;
 
-        OnZoomChanged?.Invoke(new(ZoomFactor));
+        OnZoomChanged?.Invoke(this, new(ZoomFactor, _isManualZoom, mode != _zoomMode));
 
         // emit selecting event
         if (EnableSelection && !ClientSelection.IsEmpty)
         {
-            SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+            SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
         }
     }
 
@@ -2028,13 +2069,35 @@ public class DXCanvas : DXControl
     #region Public methods
 
     /// <summary>
+    /// Sets zoom factor value.
+    /// </summary>
+    /// <param name="zoomValue">Zoom factor value</param>
+    /// <param name="isManualZoom">Value for <see cref="_isManualZoom"/></param>
+    public void SetZoomFactor(float zoomValue, bool isManualZoom)
+    {
+        if (_zoomFactor == zoomValue) return;
+
+        _zoomFactor = Math.Min(MaxZoom, Math.Max(zoomValue, MinZoom));
+        _isManualZoom = isManualZoom;
+        _shouldRecalculateDrawingRegion = true;
+
+        Invalidate();
+
+        OnZoomChanged?.Invoke(this, new(_zoomFactor, _isManualZoom, false));
+
+        // emit selecting event
+        if (EnableSelection && !ClientSelection.IsEmpty)
+        {
+            SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
+        }
+    }
+
+
+    /// <summary>
     /// Calculates zoom factor by the input zoom mode, and source size.
     /// </summary>
-    public float CalculateZoomFactor(ZoomMode zoomMode, float srcWidth, float srcHeight)
+    public float CalculateZoomFactor(ZoomMode zoomMode, float srcWidth, float srcHeight, int viewportW, int viewportH)
     {
-        var viewportW = Width;
-        var viewportH = Height;
-
         var horizontalPadding = Padding.Left + Padding.Right;
         var verticalPadding = Padding.Top + Padding.Bottom;
         var widthScale = (viewportW - horizontalPadding) / srcWidth;
@@ -2098,7 +2161,7 @@ public class DXCanvas : DXControl
         {
             UpdateZoomMode();
         }
-        
+
         Invalidate();
     }
 
@@ -2216,13 +2279,13 @@ public class DXCanvas : DXControl
             PanTo(zoomedDistance.Width, zoomedDistance.Height, requestRerender);
 
             // emit OnZoomChanged event
-            OnZoomChanged?.Invoke(new(_zoomFactor));
+            OnZoomChanged?.Invoke(this, new(_zoomFactor, _isManualZoom, false));
 
 
             // emit selecting event
             if (EnableSelection && !ClientSelection.IsEmpty)
             {
-                SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+                SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
             }
 
             return true;
@@ -2292,13 +2355,13 @@ public class DXCanvas : DXControl
         }
 
         // emit OnZoomChanged event
-        OnZoomChanged?.Invoke(new(_zoomFactor));
+        OnZoomChanged?.Invoke(this, new(_zoomFactor, _isManualZoom, false));
 
 
         // emit selecting event
         if (EnableSelection && !ClientSelection.IsEmpty)
         {
-            SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+            SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
         }
 
         return true;
@@ -2417,12 +2480,12 @@ public class DXCanvas : DXControl
 
 
         // emit panning event
-        Panning?.Invoke(new PanningEventArgs(loc, new PointF(_panHostFromPoint)));
+        Panning?.Invoke(this, new PanningEventArgs(loc, new PointF(_panHostFromPoint)));
 
         // emit selecting event
         if (EnableSelection && !ClientSelection.IsEmpty)
         {
-            SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+            SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
         }
 
         if (requestRerender)
@@ -2554,7 +2617,7 @@ public class DXCanvas : DXControl
         _clientSelection.Height = _selectionBeforeMove.Height;
 
 
-        SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+        SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
     }
 
 
@@ -2681,7 +2744,7 @@ public class DXCanvas : DXControl
             }
         }
 
-        SelectionChanged?.Invoke(new SelectionEventArgs(ClientSelection, SourceSelection));
+        SelectionChanged?.Invoke(this, new SelectionEventArgs(ClientSelection, SourceSelection));
     }
 
 
@@ -2693,7 +2756,8 @@ public class DXCanvas : DXControl
         bool enableFading = true,
         float initOpacity = 0.5f,
         float opacityStep = 0.05f,
-        bool isForPreview = false)
+        bool isForPreview = false,
+        ImgTransform? transforms = null)
     {
         // reset variables
         _imageDrawingState = ImageDrawingState.NotStarted;
@@ -2709,7 +2773,7 @@ public class DXCanvas : DXControl
 
 
         // emit OnImageChanging event
-        ImageLoading?.Invoke();
+        ImageLoading?.Invoke(this, EventArgs.Empty);
 
 
         // Check and preprocess image info
@@ -2723,13 +2787,22 @@ public class DXCanvas : DXControl
         {
             if (UseHardwareAcceleration)
             {
-                Source = ImageSource.Direct2D;
                 _imageD2D = DXHelper.ToD2D1Bitmap(Device, imgData.Image);
+
+                // apply transformations
+                if (transforms != null)
+                {
+                    _ = RotateImage(transforms.Rotation, false);
+
+                    _ = FlipImage(transforms.Flips, false);
+                }
+
+                Source = ImageSource.Direct2D;
             }
             else
             {
-                Source = ImageSource.GDIPlus;
                 _imageGdiPlus = imgData.Bitmap;
+                Source = ImageSource.GDIPlus;
             }
 
 
@@ -2742,7 +2815,7 @@ public class DXCanvas : DXControl
             }
             else if (enableFading)
             {
-                
+
                 _imageOpacity = initOpacity;
                 _opacityStep = opacityStep;
 
@@ -2792,6 +2865,121 @@ public class DXCanvas : DXControl
         IsImageAnimating = false;
     }
 
+
+    /// <summary>
+    /// Rotates the image.
+    /// </summary>
+    public bool RotateImage(float degree, bool requestRerender = true)
+    {
+        if (_imageD2D == null || degree == 0 || degree == 360) return false;
+
+        // create effect
+        using var effect = Device.CreateEffect(Direct2DEffects.CLSID_D2D12DAffineTransform);
+        effect.SetInput(0, _imageD2D);
+
+
+        // rotate the image
+        var rotationMx = D2D_MATRIX_3X2_F.Rotation(degree);
+        var transformMx = D2D_MATRIX_3X2_F.Identity();
+
+        // translate the image after rotation
+        if (degree == 90 || degree == -270)
+        {
+            transformMx = rotationMx * D2D_MATRIX_3X2_F.Translation(SourceHeight, 0);
+        }
+        else if (degree == 180 || degree == -180)
+        {
+            transformMx = rotationMx * D2D_MATRIX_3X2_F.Translation(SourceWidth, SourceHeight);
+        }
+        else if (degree == 270 || degree == -90)
+        {
+            transformMx = rotationMx * D2D_MATRIX_3X2_F.Translation(0, SourceWidth);
+        }
+
+        effect.SetValue((int)D2D1_2DAFFINETRANSFORM_PROP.D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, transformMx);
+
+
+        // apply the transformation
+        DXHelper.DisposeD2D1Bitmap(ref _imageD2D);
+        _imageD2D = effect.GetD2D1Bitmap1(Device);
+
+        // update new source size
+        var newSize = _imageD2D.GetSize();
+        SourceWidth = newSize.width;
+        SourceHeight = newSize.height;
+
+        // render the transformation
+        if (requestRerender)
+        {
+            Refresh();
+        }
+
+        return true;
+    }
+
+
+    /// <summary>
+    /// Flips the image.
+    /// </summary>
+    public bool FlipImage(FlipOptions flips, bool requestRerender = true)
+    {
+        if (_imageD2D == null) return false;
+
+        // create effect
+        using var effect = Device.CreateEffect(Direct2DEffects.CLSID_D2D12DAffineTransform);
+        effect.SetInput(0, _imageD2D);
+
+
+        // flip transformation
+        if (flips.HasFlag(FlipOptions.Horizontal))
+        {
+            var flipHorizMx = new D2D_MATRIX_3X2_F(-1f, 0, 0, 1f, 0, 0);
+            effect.SetValue((int)D2D1_2DAFFINETRANSFORM_PROP.D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, flipHorizMx * D2D_MATRIX_3X2_F.Translation(SourceWidth, 0));
+        }
+
+        if (flips.HasFlag(FlipOptions.Vertical))
+        {
+            var flipVertMx = new D2D_MATRIX_3X2_F(1f, 0, 0, -1f, 0, 0);
+            effect.SetValue((int)D2D1_2DAFFINETRANSFORM_PROP.D2D1_2DAFFINETRANSFORM_PROP_TRANSFORM_MATRIX, flipVertMx * D2D_MATRIX_3X2_F.Translation(0, SourceHeight));
+        }
+
+
+        // apply the transformation
+        DXHelper.DisposeD2D1Bitmap(ref _imageD2D);
+        _imageD2D = effect.GetD2D1Bitmap1(Device);
+
+        // render the transformation
+        if (requestRerender)
+        {
+            Refresh();
+        }
+
+        return true;
+    }
+
+
+    /// <summary>
+    /// Gets pixel color.
+    /// </summary>
+    /// <returns>
+    /// <see cref="Color.Transparent"/> if the <see cref="Source"/> is <see cref="ImageSource.Null"/>.
+    /// </returns>
+    public Color GetColorAt(int x, int y)
+    {
+        if (Source == ImageSource.Direct2D)
+        {
+            return _imageD2D.GetPixelColor(Device, x, y);
+        }
+
+        if (Source == ImageSource.GDIPlus)
+        {
+            return _imageGdiPlus.GetPixelColor(x, y);
+        }
+
+
+        return Color.Transparent;
+    }
+
     #endregion // Public methods
 
 
@@ -2806,8 +2994,9 @@ public class DXCanvas : DXControl
     {
         CanImageAnimate = imgData?.CanAnimate ?? false;
         HasAlphaPixels = imgData?.HasAlpha ?? false;
+        var hasGdiPlusSource = imgData?.Bitmap != null;
 
-        if (CanImageAnimate)
+        if (CanImageAnimate || hasGdiPlusSource)
         {
             SourceWidth = imgData?.Bitmap?.Width ?? 0;
             SourceHeight = imgData?.Bitmap?.Height ?? 0;
@@ -2821,7 +3010,7 @@ public class DXCanvas : DXControl
         var exceedMaxDimention = SourceWidth > Constants.MAX_IMAGE_DIMENSION
             || SourceHeight > Constants.MAX_IMAGE_DIMENSION;
 
-        UseHardwareAcceleration = !CanImageAnimate && !exceedMaxDimention;
+        UseHardwareAcceleration = !hasGdiPlusSource && !CanImageAnimate && !exceedMaxDimention;
     }
 
     private void OnImageFrameChanged(object? sender, EventArgs eventArgs)

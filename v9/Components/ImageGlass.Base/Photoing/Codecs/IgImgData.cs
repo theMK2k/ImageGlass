@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -47,8 +47,6 @@ public class IgImgData : IDisposable
             Bitmap?.Dispose();
             Bitmap = null;
 
-            ExifProfile = null;
-            ColorProfile = null;
             FrameCount = 0;
             HasAlpha = false;
             CanAnimate = false;
@@ -82,10 +80,8 @@ public class IgImgData : IDisposable
     public int FrameCount { get; set; } = 0;
     public bool HasAlpha { get; set; } = false;
     public bool CanAnimate { get; set; } = false;
-    public IExifProfile? ExifProfile { get; set; } = null;
-    public IColorProfile? ColorProfile { get; set; } = null;
-    
-    
+
+
     public IgImgData() { }
 
 
@@ -95,8 +91,6 @@ public class IgImgData : IDisposable
     public IgImgData(IgMagickReadData data)
     {
         FrameCount = data.FrameCount;
-        ColorProfile = data.ColorProfile;
-        ExifProfile = data.ExifProfile;
 
         if (data.MultiFrameImage != null)
         {
@@ -110,14 +104,26 @@ public class IgImgData : IDisposable
             }
             else
             {
-                using var bmp = data.MultiFrameImage.ToBitmap(ImageFormat.Tiff);
-                Image = BHelper.ToWicBitmapSource(bmp);
+                Bitmap = data.MultiFrameImage.ToBitmap(ImageFormat.Tiff);
+                Image = BHelper.ToWicBitmapSource(Bitmap);
+
+                if (Image != null)
+                {
+                    Bitmap.Dispose();
+                    Bitmap = null;
+                }
             }
         }
         else
         {
-            Image = BHelper.ToWicBitmapSource(data.SingleFrameImage?.ToBitmapSource());
             HasAlpha = data.SingleFrameImage?.HasAlpha ?? false;
+            Image = BHelper.ToWicBitmapSource(data.SingleFrameImage?.ToBitmapSourceWithDensity());
+
+            // fall back to GDI+ Bitmap
+            if (Image == null)
+            {
+                Bitmap = data.SingleFrameImage.ToBitmapWithDensity();
+            }
         }
     }
 }

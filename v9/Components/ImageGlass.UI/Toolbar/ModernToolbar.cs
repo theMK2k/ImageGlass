@@ -65,7 +65,8 @@ public class ModernToolbar : ToolStrip
     /// <summary>
     /// Show or hide main menu button of toolbar
     /// </summary>
-    public bool ShowMainMenuButton {
+    public bool ShowMainMenuButton
+    {
         get => _mainMenuButton.Visible;
         set => _mainMenuButton.Visible = value;
     }
@@ -78,7 +79,8 @@ public class ModernToolbar : ToolStrip
     /// <summary>
     /// Gets, sets main menu
     /// </summary>
-    public ContextMenuStrip MainMenu {
+    public ContextMenuStrip MainMenu
+    {
         get => _mainMenu;
         set
         {
@@ -351,7 +353,7 @@ public class ModernToolbar : ToolStrip
     public void ShowMainMenu()
     {
         var x = MainMenuButton.Bounds.Left + MainMenuButton.Bounds.Width - MainMenu.Width;
-        var y = Visible ? Height: 10;
+        var y = Visible ? Height : 10;
 
         MainMenu.Show(this, x, y);
     }
@@ -380,7 +382,7 @@ public class ModernToolbar : ToolStrip
         _tooltipTokenSrc = new();
 
         _tooltip.Hide(this);
-        
+
         try
         {
             const int TOOLTIP_HEIGHT = 28;
@@ -537,12 +539,12 @@ public class ModernToolbar : ToolStrip
     {
         var item = Items[name];
 
-        if (item is null || item.GetType() != typeof (T))
+        if (item is null || item.GetType() != typeof(T))
         {
             return default;
         }
 
-        return (T)Convert.ChangeType(item, typeof (T));
+        return (T)Convert.ChangeType(item, typeof(T));
     }
 
 
@@ -550,7 +552,6 @@ public class ModernToolbar : ToolStrip
     /// Gets ToolStripButton by name
     /// </summary>
     /// <param name="name">Name of item</param>
-    /// <returns></returns>
     public ToolStripButton? GetItem(string name)
     {
         return GetItem<ToolStripButton>(name);
@@ -558,21 +559,24 @@ public class ModernToolbar : ToolStrip
 
 
     /// <summary>
-    /// Adds new toolbar item
+    /// Adds new toolbar item.
     /// </summary>
     /// <param name="model">Item model</param>
+    /// <param name="position">The location in the items list at which to insert the toolbar item</param>
     /// <param name="modifier">Modifier function to modify item properties</param>
-    /// <returns></returns>
     public ToolbarAddItemResult AddItem(ToolbarItemModel model,
+        int? position = null,
         Action<ToolStripItem>? modifier = null)
     {
+        position ??= Items.Count;
+
         // separator
         if (model.Type == ToolbarItemModelType.Separator)
         {
             var sItem = new ToolStripSeparator();
             modifier?.Invoke(sItem);
 
-            Items.Add(sItem);
+            Items.Insert(position.Value, sItem);
             return ToolbarAddItemResult.Success;
         }
 
@@ -605,7 +609,7 @@ public class ModernToolbar : ToolStrip
         };
 
         modifier?.Invoke(bItem);
-        Items.Add(bItem);
+        Items.Insert(position.Value, bItem);
 
         return ToolbarAddItemResult.Success;
     }
@@ -621,7 +625,7 @@ public class ModernToolbar : ToolStrip
     {
         foreach (var item in list)
         {
-            _ = AddItem(item, modifier);
+            _ = AddItem(item, null, modifier);
         }
     }
 

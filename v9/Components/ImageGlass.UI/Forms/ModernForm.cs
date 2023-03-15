@@ -28,6 +28,7 @@ namespace ImageGlass.UI;
 public partial class ModernForm : Form
 {
     private bool _darkMode = true;
+    private bool _enableTransparent = true;
     private BackdropStyle _backdropStyle = BackdropStyle.MicaAlt;
     private Padding _backdropMargin = new(-1);
     private int _dpi = DpiApi.DPI_DEFAULT;
@@ -40,7 +41,23 @@ public partial class ModernForm : Form
     /// <summary>
     /// Enable transparent background.
     /// </summary>
-    public virtual bool EnableTransparent { get; set; } = true;
+    public virtual bool EnableTransparent
+    {
+        get
+        {
+            if (!WinColorsApi.IsTransparencyEnabled
+                || !BHelper.IsOS(WindowsOS.Win11_22H2_OrLater))
+            {
+                _enableTransparent = false;
+            }
+
+            return _enableTransparent;
+        }
+        set
+        {
+            _enableTransparent = value;
+        }
+    }
 
 
     /// <summary>
@@ -252,7 +269,7 @@ public partial class ModernForm : Form
 
         if (!DesignMode
             && EnableTransparent
-            && BackdropStyle != BackdropStyle.Default
+            && BackdropStyle != BackdropStyle.None
             && BackdropMargin.Vertical == 0 && BackdropMargin.Horizontal == 0)
         {
             WindowApi.SetTransparentBlackBackground(e.Graphics, Bounds);
@@ -331,7 +348,7 @@ public partial class ModernForm : Form
         if (DesignMode) return;
 
         var backupBgColor = BackColor;
-        if (style != BackdropStyle.Default && EnableTransparent)
+        if (style != BackdropStyle.None && EnableTransparent)
         {
             // back color must be black
             BackColor = Color.Black;
@@ -339,7 +356,7 @@ public partial class ModernForm : Form
 
         // set backdrop style
         var succeeded = WindowApi.SetWindowBackdrop(Handle, (DWM_SYSTEMBACKDROP_TYPE)style);
-        var margin = (succeeded && style != BackdropStyle.Default && EnableTransparent)
+        var margin = (succeeded && style != BackdropStyle.None && EnableTransparent)
             ? BackdropMargin
             : new Padding(0);
 
@@ -419,12 +436,8 @@ public partial class ModernForm : Form
             await Task.Delay(200, token);
             token.ThrowIfCancellationRequested();
 
-            var eventArgs = new SystemColorModeChangedEventArgs();
-            if (DarkMode != eventArgs.IsDarkMode)
-            {
-                // emit event here
-                OnRequestUpdatingColorMode(eventArgs);
-            }
+            // emit event here
+            OnRequestUpdatingColorMode(new SystemColorModeChangedEventArgs());
         }
         catch (OperationCanceledException) { }
     }
@@ -518,6 +531,7 @@ public partial class ModernForm : Form
             || (c is Label && c is not LinkLabel)
             || c is PictureBox
             || c is TableLayoutPanel
+            || c is ProgressBar
             || c.HasChildren;
     }
 

@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -53,18 +53,30 @@ public class ZoomEventArgs : EventArgs
     /// </summary>
     public float ZoomFactor { get; private set; } = 0f;
 
+    /// <summary>
+    /// Gets, sets the value indicates that zoom factor is changed manually by <see cref="DXCanvas.ZoomFactor"/>
+    /// </summary>
+    public bool IsManualZoom { get; private set; } = false;
 
-    public ZoomEventArgs(float zoomFactor)
+    /// <summary>
+    /// Gets, sets the value indicates that <see cref="DXCanvas.ZoomMode"/> is changed.
+    /// </summary>
+    public bool IsZoomModeChange { get; private set; } = false;
+
+
+    public ZoomEventArgs(float zoomFactor, bool isManualZoom, bool isZoomModeChanged)
     {
         ZoomFactor = zoomFactor;
+        IsManualZoom = isManualZoom;
+        IsZoomModeChange = isZoomModeChanged;
     }
 }
 
 
 /// <summary>
-/// MouseMouse event arguments
+/// Mouse event arguments
 /// </summary>
-public class ImageMouseMoveEventArgs : EventArgs
+public class ImageMouseEventArgs : EventArgs
 {
     /// <summary>
     /// Gets the x-coordinate of the image
@@ -82,7 +94,7 @@ public class ImageMouseMoveEventArgs : EventArgs
     public MouseButtons Button { get; private set; } = MouseButtons.Left;
 
 
-    public ImageMouseMoveEventArgs(float imgX, float imgY, MouseButtons button)
+    public ImageMouseEventArgs(float imgX, float imgY, MouseButtons button)
     {
         Button = button;
         ImageX = imgX;

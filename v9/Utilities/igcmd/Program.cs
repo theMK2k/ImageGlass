@@ -119,13 +119,24 @@ internal static class Program
             if (args.Length > 2)
             {
                 Application.Run(new Slideshow.FrmSlideshow(args[1], args[2]));
-            }
-            else
-            {
-                return (int)IgExitCode.Error;
+
+                return (int)IgExitCode.Done;
             }
 
-            return (int)IgExitCode.Done;
+            return (int)IgExitCode.Error;
+        }
+        #endregion
+
+
+        #region EXPORT_FRAMES <string filePath>
+        if (topCmd == IgCommands.EXPORT_FRAMES)
+        {
+            if (args.Length > 1)
+            {
+                return (int)Functions.ExportImageFrames(args[1]);
+            }
+
+            return (int)IgExitCode.Error;
         }
         #endregion
 

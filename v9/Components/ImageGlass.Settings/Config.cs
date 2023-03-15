@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -50,76 +50,76 @@ public static class Config
         {
             Id = "Btn_OpenFile",
             Alignment = ToolStripItemAlignment.Right,
-            Image = "OpenFile",
+            Image = nameof(Theme.ToolbarIcons.OpenFile),
             OnClick = new("MnuOpenFile"),
         },
         new()
         {
             Id = "Btn_ViewPrevious",
-            Image = "ViewPreviousImage",
+            Image = nameof(Theme.ToolbarIcons.ViewPreviousImage),
             OnClick = new("MnuViewPrevious"),
         },
         new()
         {
             Id = "Btn_ViewNext",
-            Image = "ViewNextImage",
+            Image = nameof(Theme.ToolbarIcons.ViewNextImage),
             OnClick = new("MnuViewNext"),
         },
         new() { Type = ToolbarItemModelType.Separator },
         new()
         {
             Id = "Btn_AutoZoom",
-            Image = "AutoZoom",
+            Image = nameof(Theme.ToolbarIcons.AutoZoom),
             OnClick = new("MnuAutoZoom"),
         },
         new()
         {
             Id = "Btn_LockZoom",
-            Image = "LockZoom",
+            Image = nameof(Theme.ToolbarIcons.LockZoom),
             OnClick = new("MnuLockZoom"),
         },
         new()
         {
             Id = "Btn_ScaleToWidth",
-            Image = "ScaleToWidth",
+            Image = nameof(Theme.ToolbarIcons.ScaleToWidth),
             OnClick = new("MnuScaleToWidth"),
         },
         new()
         {
             Id = "Btn_ScaleToHeight",
-            Image = "ScaleToHeight",
+            Image = nameof(Theme.ToolbarIcons.ScaleToHeight),
             OnClick = new("MnuScaleToHeight"),
         },
         new()
         {
             Id = "Btn_ScaleToFit",
-            Image = "ScaleToFit",
+            Image = nameof(Theme.ToolbarIcons.ScaleToFit),
             OnClick = new("MnuScaleToFit"),
         },
         new()
         {
             Id = "Btn_ScaleToFill",
-            Image = "ScaleToFill",
+            Image = nameof(Theme.ToolbarIcons.ScaleToFill),
             OnClick = new("MnuScaleToFill"),
         },
         new() { Type = ToolbarItemModelType.Separator },
         new()
         {
             Id = "Btn_Refresh",
-            Image = "Refresh",
+            Image = nameof(Theme.ToolbarIcons.Refresh),
             OnClick = new("MnuRefresh"),
         },
         new()
         {
             Id = "Btn_Thumbnail",
-            Image = "ThumbnailBar",
+            Image = nameof(Theme.ToolbarIcons.ThumbnailBar),
             CheckableConfigBinding = nameof(ShowThumbnails),
             OnClick = new("MnuToggleThumbnails"),
         },
         new()
         {
             Id = "Btn_Checkerboard",
-            Image = "Checkerboard",
+            Image = nameof(Theme.ToolbarIcons.Checkerboard),
             CheckableConfigBinding = nameof(ShowCheckerBoard),
             OnClick = new("MnuToggleCheckerboard"),
         },
@@ -127,26 +127,28 @@ public static class Config
         new()
         {
             Id = "Btn_FullScreen",
-            Image = "FullScreen",
+            Image = nameof(Theme.ToolbarIcons.FullScreen),
             CheckableConfigBinding = nameof(EnableFullScreen),
             OnClick = new("MnuFullScreen"),
         },
+        new()
+        {
+            Id = "Btn_Slideshow",
+            Image = nameof(Theme.ToolbarIcons.Slideshow),
+            CheckableConfigBinding = nameof(EnableSlideshow),
+            OnClick = new("MnuStartSlideshow"),
+        },
         new() { Type = ToolbarItemModelType.Separator },
-        //new()
-        //{
-        //    Id = "Btn_Edit",
-        //    Image = "Edit",
-        //},
         new()
         {
             Id = "Btn_Print",
-            Image = "Print",
+            Image = nameof(Theme.ToolbarIcons.Print),
             OnClick = new("MnuPrint"),
         },
         new()
         {
             Id = "Btn_Delete",
-            Image = "Delete",
+            Image = nameof(Theme.ToolbarIcons.Delete),
             OnClick = new("MnuMoveToRecycleBin"),
         }
     };
@@ -162,11 +164,17 @@ public static class Config
         nameof(ImageInfo.Zoom),
         nameof(ImageInfo.Dimension),
         nameof(ImageInfo.FileSize),
+        nameof(ImageInfo.ColorSpace),
         nameof(ImageInfo.ExifRating),
         nameof(ImageInfo.DateTimeAuto),
         nameof(ImageInfo.AppName),
     };
 
+
+    /// <summary>
+    /// Gets, sets current theme.
+    /// </summary>
+    public static IgTheme Theme { get; set; } = new();
 
     #endregion
 
@@ -174,13 +182,13 @@ public static class Config
     #region Setting items
 
     /// <summary>
-    /// Gets, sets the config section of tools
+    /// Gets, sets the config section of tool settings.
     /// </summary>
-    public static ExpandoObject Tools { get; set; } = new ExpandoObject();
+    public static ExpandoObject ToolSettings { get; set; } = new ExpandoObject();
 
 
     #region Boolean items
-    
+
     /// <summary>
     /// Gets, sets value indicating whether the slideshow mode is enabled or not.
     /// </summary>
@@ -204,12 +212,17 @@ public static class Config
     /// <summary>
     /// Gets, sets value indicates that slideshow will loop back to the first image when reaching the end of list.
     /// </summary>
-    public static bool LoopSlideshow { get; set; } = true;
+    public static bool ShouldLoopSlideshow { get; set; } = true;
 
     /// <summary>
     /// Gets, sets value indicates that slideshow is played in window mode, not full screen.
     /// </summary>
-    public static bool UseWindowedSlideshow { get; set; } = false;
+    public static bool EnableWindowedSlideshow { get; set; } = false;
+
+    /// <summary>
+    /// Gets, sets value of FrmMain's frameless mode.
+    /// </summary>
+    public static bool EnableFrameless { get; set; } = false;
 
     /// <summary>
     /// Gets, sets value indicating whether the full screen mode is enabled or not.
@@ -281,11 +294,6 @@ public static class Config
     /// </summary>
     public static bool EnableLoopBackNavigation { get; set; } = true;
 
-    ///// <summary>
-    ///// Gets, sets value indicating that allow quit application by ESC
-    ///// </summary>
-    //public static bool EnablePressESCToQuit { get; set; } = true;
-
     /// <summary>
     /// Gets, sets value indicating that checker board is shown or not
     /// </summary>
@@ -300,16 +308,6 @@ public static class Config
     /// Gets, sets value indicating that FrmMain is always on top or not.
     /// </summary>
     public static bool EnableWindowTopMost { get; set; } = false;
-
-    ///// <summary>
-    ///// Gets, sets value of FrmMain's frameless mode.
-    ///// </summary>
-    //public static bool IsWindowFrameless { get; set; } = false;
-
-    ///// <summary>
-    ///// Gets, sets the direction of thumbnail bar
-    ///// </summary>
-    //public static bool IsThumbnailHorizontal { get; set; } = true;
 
     /// <summary>
     /// Gets, sets value indicating that Confirmation dialog is displayed when deleting image
@@ -334,32 +332,27 @@ public static class Config
     /// <summary>
     /// Gets, sets the setting to control whether the image's original modified date value is preserved on save
     /// </summary>
-    public static bool PreserveModifiedDate { get; set; } = false;
+    public static bool ShouldPreserveModifiedDate { get; set; } = false;
 
     /// <summary>
     /// Gets, sets the value indicates that there is a new version
     /// </summary>
-    public static bool IsNewVersionAvailable { get; set; } = false;
-
-    ///// <summary>
-    ///// Gets, sets the value indicates that to show full image path or only base name
-    ///// </summary>
-    //public static bool IsDisplayBasenameOfImage { get; set; } = false;
+    public static bool ShowNewVersionIndicator { get; set; } = false;
 
     /// <summary>
     /// Gets, sets the value indicates that to toolbar buttons to be centered horizontally
     /// </summary>
-    public static bool CenterToolbar { get; set; } = true;
+    public static bool EnableCenterToolbar { get; set; } = true;
 
     /// <summary>
     /// Gets, sets the value indicates that to show last seen image on startup
     /// </summary>
-    public static bool OpenLastSeenImage { get; set; } = true;
+    public static bool ShouldOpenLastSeenImage { get; set; } = true;
 
     /// <summary>
     /// Gets, sets the value indicates that the ColorProfile will be applied for all or only the images with embedded profile
     /// </summary>
-    public static bool ApplyColorProfileForAll { get; set; } = false;
+    public static bool ShouldUseColorProfileForAll { get; set; } = false;
 
     /// <summary>
     /// Gets, sets the value indicates whether to show or hide the Navigation Buttons on viewer
@@ -379,17 +372,17 @@ public static class Config
     /// <summary>
     /// Gets, sets the value indicates that Windows File Explorer sort order is used if possible
     /// </summary>
-    public static bool UseFileExplorerSortOrder { get; set; } = true;
+    public static bool ShouldUseExplorerSortOrder { get; set; } = true;
 
     /// <summary>
     /// Gets, sets the value indicates that images order should be grouped by directory
     /// </summary>
-    public static bool GroupImagesByDirectory { get; set; } = false;
+    public static bool ShouldGroupImagesByDirectory { get; set; } = false;
 
     /// <summary>
     /// Gets, sets showing/loading hidden images
     /// </summary>
-    public static bool IncludeHiddenImages { get; set; } = false;
+    public static bool ShouldLoadHiddenImages { get; set; } = false;
 
     ///// <summary>
     ///// Gets, sets value that indicates frmColorPicker tool will be open on startup
@@ -406,15 +399,15 @@ public static class Config
     ///// </summary>
     //public static bool IsShowPageNavAuto { get; set; } = false;
 
-    ///// <summary>
-    ///// Gets, sets value specifying that Window Fit mode is on
-    ///// </summary>
-    //public static bool IsWindowFit { get; set; } = false;
+    /// <summary>
+    /// Gets, sets value specifying that Window Fit mode is on
+    /// </summary>
+    public static bool EnableWindowFit { get; set; } = false;
 
-    ///// <summary>
-    ///// Gets, sets value indicates the window should be always center in Window Fit mode
-    ///// </summary>
-    //public static bool IsCenterWindowFit { get; set; } = true;
+    /// <summary>
+    /// Gets, sets value indicates the window should be always center in Window Fit mode
+    /// </summary>
+    public static bool CenterWindowFit { get; set; } = true;
 
     ///// <summary>
     ///// Gets, sets value indicates that touch gesture support enabled
@@ -465,6 +458,16 @@ public static class Config
     /// Enables / Disables cut multiple files.
     /// </summary>
     public static bool EnableCutMultipleFiles { get; set; } = true;
+
+    /// <summary>
+    /// Enables / Disables the file system watcher.
+    /// </summary>
+    public static bool EnableFileWatcher { get; set; } = true;
+
+    /// <summary>
+    /// Gets, sets value indicates that ImageGlass should open the new image file added in the viewing folder.
+    /// </summary>
+    public static bool ShouldAutoOpenNewAddedImage { get; set; } = false;
 
 
     #endregion
@@ -572,10 +575,10 @@ public static class Config
     /// </summary>
     public static int ThumbnailCacheSizeInMb { get; set; } = 400;
 
-    ///// <summary>
-    ///// Gets, sets width of horizontal thumbnail bar
-    ///// </summary>
-    //public static int ThumbnailBarWidth { get; set; } = new ThumbnailItemInfo(ThumbnailDimension, true).GetTotalDimension();
+    /// <summary>
+    /// Gets, sets width of horizontal thumbnail bar.
+    /// </summary>
+    public static int ThumbnailBarWidth { get; set; } = (int)(ThumbnailSize * 2.5);
 
     /// <summary>
     /// Gets, sets the number of images cached by <see cref="Base.Services.ImageBooster"/>.
@@ -593,7 +596,7 @@ public static class Config
     /// If this value is <c>less than or equals 0</c>, the option will be ignored.
     /// </summary>
     public static float ImageBoosterCacheMaxFileSizeInMb { get; set; } = 100f;
-    
+
     /// <summary>
     /// Gets, sets fixed width on zooming
     /// </summary>
@@ -639,12 +642,22 @@ public static class Config
     /// <summary>
     /// Gets, sets the last time to check for update. Set it to "0" to disable auto-update.
     /// </summary>
-    public static string AutoUpdate { get; set; } = "7/20/2010 12:13:08";
+    public static string AutoUpdate { get; set; } = "7/22/2010 12:13:08";
 
     /// <summary>
     /// Gets, sets the absolute file path of the last seen image
     /// </summary>
     public static string LastSeenImagePath { get; set; } = "";
+
+    /// <summary>
+    /// Gets, sets the theme name for dark mode.
+    /// </summary>
+    public static string DarkTheme { get; set; } = "";
+
+    /// <summary>
+    /// Gets, sets the theme name for light mode.
+    /// </summary>
+    public static string LightTheme { get; set; } = "";
 
     ///// <summary>
     ///// Gets, sets the absolute file path of the exiftool executable file
@@ -661,10 +674,10 @@ public static class Config
 
     #region Array items
 
-    ///// <summary>
-    ///// Gets, sets the list of Image Editing Association
-    ///// </summary>
-    //public static List<EditApp> EditApps { get; set; } = new();
+    /// <summary>
+    /// Gets, sets the list of apps for edit action.
+    /// </summary>
+    public static Dictionary<string, EditApp?> EditApps { get; set; } = new();
 
     /// <summary>
     /// Gets, sets the list of supported image formats
@@ -700,6 +713,27 @@ public static class Config
     /// Gets, sets mouse wheel actions
     /// </summary>
     public static Dictionary<MouseWheelEvent, MouseWheelAction> MouseWheelActions = new();
+
+    /// <summary>
+    /// Gets, sets layout for FrmMain. Syntax:
+    /// <c>Dictionary["ControlName", "DockStyle;order"]</c>
+    /// </summary>
+    public static Dictionary<string, string?> Layout { get; set; } = new();
+
+    /// <summary>
+    /// Gets, sets tools.
+    /// </summary>
+    public static List<IgTool?> Tools { get; set; } = new()
+    {
+        new IgTool()
+        {
+            ToolId = Constants.IGTOOL_EXIFTOOL,
+            ToolName = "ExifGlass - Exif metadata viewer",
+            Executable = "",
+            Argument = Constants.FILE_MACRO,
+            CanToggle = true,
+        },
+    };
 
     #endregion
 
@@ -749,15 +783,10 @@ public static class Config
     public static ImageInterpolation ImageInterpolationScaleUp { get; set; } = ImageInterpolation.NearestNeighbor;
 
 
-    ///// <summary>
-    ///// Gets, sets toolbar position
-    ///// </summary>
-    //public static ToolbarPosition ToolbarPosition { get; set; } = ToolbarPosition.Top;
-
-    ///// <summary>
-    ///// Gets, sets value indicates what happens after clicking Edit menu
-    ///// </summary>
-    //public static AfterOpeningEditAppAction AfterEditingAction { get; set; } = AfterOpeningEditAppAction.Nothing;
+    /// <summary>
+    /// Gets, sets value indicates what happens after clicking Edit menu
+    /// </summary>
+    public static AfterEditAppAction AfterEditingAction { get; set; } = AfterEditAppAction.Nothing;
 
 
     /// <summary>
@@ -765,7 +794,7 @@ public static class Config
     /// </summary>
     public static BackdropStyle WindowBackdrop { get; set; } = BackdropStyle.Mica;
 
-    #endregion
+    #endregion // Enum items
 
 
     #region Other types items
@@ -785,15 +814,9 @@ public static class Config
     /// </summary>
     public static IgLang Language { get; set; }
 
-    /// <summary>
-    /// Gets, sets theme
-    /// </summary>
-    public static IgTheme Theme { get; set; }
+    #endregion // Other types items
 
-    #endregion
-
-    #endregion
-
+    #endregion // Setting items
 
 
 
@@ -807,7 +830,7 @@ public static class Config
         var items = Source.LoadUserConfigs();
 
         // save the config for all tools
-        Tools = items.GetValue(nameof(Tools)).GetValue(nameof(Tools), new ExpandoObject());
+        ToolSettings = items.GetValue(nameof(ToolSettings)).GetValue(nameof(ToolSettings), new ExpandoObject());
 
 
         // Boolean values
@@ -817,8 +840,9 @@ public static class Config
         HideFrmMainInSlideshow = items.GetValue(nameof(HideFrmMainInSlideshow), HideFrmMainInSlideshow);
         ShowSlideshowCountdown = items.GetValue(nameof(ShowSlideshowCountdown), ShowSlideshowCountdown);
         UseRandomIntervalForSlideshow = items.GetValue(nameof(UseRandomIntervalForSlideshow), UseRandomIntervalForSlideshow);
-        LoopSlideshow = items.GetValue(nameof(LoopSlideshow), LoopSlideshow);
-        UseWindowedSlideshow = items.GetValue(nameof(UseWindowedSlideshow), UseWindowedSlideshow);
+        ShouldLoopSlideshow = items.GetValue(nameof(ShouldLoopSlideshow), ShouldLoopSlideshow);
+        EnableWindowedSlideshow = items.GetValue(nameof(EnableWindowedSlideshow), EnableWindowedSlideshow);
+        EnableFrameless = items.GetValue(nameof(EnableFrameless), EnableFrameless);
         EnableFullScreen = items.GetValue(nameof(EnableFullScreen), EnableFullScreen);
         ShowThumbnails = items.GetValue(nameof(ShowThumbnails), ShowThumbnails);
         ShowThumbnailScrollbars = items.GetValue(nameof(ShowThumbnailScrollbars), ShowThumbnailScrollbars);
@@ -831,33 +855,29 @@ public static class Config
         //IsShowWelcome = items.GetValue(nameof(IsShowWelcome), IsShowWelcome);
         ShowToolbar = items.GetValue(nameof(ShowToolbar), ShowToolbar);
         EnableLoopBackNavigation = items.GetValue(nameof(EnableLoopBackNavigation), EnableLoopBackNavigation);
-        //EnablePressESCToQuit = items.GetValue(nameof(EnablePressESCToQuit), EnablePressESCToQuit);
         ShowCheckerBoard = items.GetValue(nameof(ShowCheckerBoard), ShowCheckerBoard);
         EnableMultiInstances = items.GetValue(nameof(EnableMultiInstances), EnableMultiInstances);
         EnableWindowTopMost = items.GetValue(nameof(EnableWindowTopMost), EnableWindowTopMost);
-        //IsWindowFrameless = items.GetValue(nameof(IsWindowFrameless), IsWindowFrameless);
-        //IsThumbnailHorizontal = items.GetValue(nameof(IsThumbnailHorizontal), IsThumbnailHorizontal);
         ShowDeleteConfirmation = items.GetValue(nameof(ShowDeleteConfirmation), ShowDeleteConfirmation);
         ShowSaveOverrideConfirmation = items.GetValue(nameof(ShowSaveOverrideConfirmation), ShowSaveOverrideConfirmation);
         //IsScrollbarsVisible = items.GetValue(nameof(IsScrollbarsVisible), IsScrollbarsVisible);
         //IsSaveAfterRotating = items.GetValue(nameof(IsSaveAfterRotating), IsSaveAfterRotating);
-        PreserveModifiedDate = items.GetValue(nameof(PreserveModifiedDate), PreserveModifiedDate);
-        IsNewVersionAvailable = items.GetValue(nameof(IsNewVersionAvailable), IsNewVersionAvailable);
-        //IsDisplayBasenameOfImage = items.GetValue(nameof(IsDisplayBasenameOfImage), IsDisplayBasenameOfImage);
-        CenterToolbar = items.GetValue(nameof(CenterToolbar), CenterToolbar);
-        OpenLastSeenImage = items.GetValue(nameof(OpenLastSeenImage), OpenLastSeenImage);
-        ApplyColorProfileForAll = items.GetValue(nameof(ApplyColorProfileForAll), ApplyColorProfileForAll);
+        ShouldPreserveModifiedDate = items.GetValue(nameof(ShouldPreserveModifiedDate), ShouldPreserveModifiedDate);
+        ShowNewVersionIndicator = items.GetValue(nameof(ShowNewVersionIndicator), ShowNewVersionIndicator);
+        EnableCenterToolbar = items.GetValue(nameof(EnableCenterToolbar), EnableCenterToolbar);
+        ShouldOpenLastSeenImage = items.GetValue(nameof(ShouldOpenLastSeenImage), ShouldOpenLastSeenImage);
+        ShouldUseColorProfileForAll = items.GetValue(nameof(ShouldUseColorProfileForAll), ShouldUseColorProfileForAll);
         EnableNavigationButtons = items.GetValue(nameof(EnableNavigationButtons), EnableNavigationButtons);
         ShowCheckerboardOnlyImageRegion = items.GetValue(nameof(ShowCheckerboardOnlyImageRegion), ShowCheckerboardOnlyImageRegion);
         EnableRecursiveLoading = items.GetValue(nameof(EnableRecursiveLoading), EnableRecursiveLoading);
-        UseFileExplorerSortOrder = items.GetValue(nameof(UseFileExplorerSortOrder), UseFileExplorerSortOrder);
-        GroupImagesByDirectory = items.GetValue(nameof(GroupImagesByDirectory), GroupImagesByDirectory);
-        IncludeHiddenImages = items.GetValue(nameof(IncludeHiddenImages), IncludeHiddenImages);
+        ShouldUseExplorerSortOrder = items.GetValue(nameof(ShouldUseExplorerSortOrder), ShouldUseExplorerSortOrder);
+        ShouldGroupImagesByDirectory = items.GetValue(nameof(ShouldGroupImagesByDirectory), ShouldGroupImagesByDirectory);
+        ShouldLoadHiddenImages = items.GetValue(nameof(ShouldLoadHiddenImages), ShouldLoadHiddenImages);
         //IsShowColorPickerOnStartup = items.GetValue(nameof(IsShowColorPickerOnStartup), IsShowColorPickerOnStartup);
         //IsShowPageNavOnStartup = items.GetValue(nameof(IsShowPageNavOnStartup), IsShowPageNavOnStartup);
         //IsShowPageNavAuto = items.GetValue(nameof(IsShowPageNavAuto), IsShowPageNavAuto);
-        //IsWindowFit = items.GetValue(nameof(IsWindowFit), IsWindowFit);
-        //IsCenterWindowFit = items.GetValue(nameof(IsCenterWindowFit), IsCenterWindowFit);
+        EnableWindowFit = items.GetValue(nameof(EnableWindowFit), EnableWindowFit);
+        CenterWindowFit = items.GetValue(nameof(CenterWindowFit), CenterWindowFit);
         //IsUseTouchGesture = items.GetValue(nameof(IsUseTouchGesture), IsUseTouchGesture);
         //IsHideTooltips = items.GetValue(nameof(IsHideTooltips), IsHideTooltips);
         //IsExifToolAlwaysOnTop = items.GetValue(nameof(IsExifToolAlwaysOnTop), IsExifToolAlwaysOnTop);
@@ -868,6 +888,8 @@ public static class Config
         EnableImageTransition = items.GetValue(nameof(EnableImageTransition), EnableImageTransition);
         EnableCopyMultipleFiles = items.GetValue(nameof(EnableCopyMultipleFiles), EnableCopyMultipleFiles);
         EnableCutMultipleFiles = items.GetValue(nameof(EnableCutMultipleFiles), EnableCutMultipleFiles);
+        EnableFileWatcher = items.GetValue(nameof(EnableFileWatcher), EnableFileWatcher);
+        ShouldAutoOpenNewAddedImage = items.GetValue(nameof(ShouldAutoOpenNewAddedImage), ShouldAutoOpenNewAddedImage);
 
         HideToolbarInFullscreen = items.GetValue(nameof(HideToolbarInFullscreen), HideToolbarInFullscreen);
         HideThumbnailsInFullscreen = items.GetValue(nameof(HideThumbnailsInFullscreen), HideThumbnailsInFullscreen);
@@ -913,19 +935,7 @@ public static class Config
         #region Load thumbnail bar width & position
         ThumbnailSize = items.GetValue(nameof(ThumbnailSize), ThumbnailSize);
         ThumbnailCacheSizeInMb = items.GetValue(nameof(ThumbnailCacheSizeInMb), ThumbnailCacheSizeInMb);
-
-        //if (IsThumbnailHorizontal)
-        //{
-        //    // Get minimum width needed for thumbnail dimension
-        //    var tbMinWidth = new ThumbnailItemInfo(ThumbnailDimension, true).GetTotalDimension();
-
-        //    // Get the greater width value
-        //    ThumbnailBarWidth = Math.Max(ThumbnailBarWidth, tbMinWidth);
-        //}
-        //else
-        //{
-        //    ThumbnailBarWidth = items.GetValue(nameof(ThumbnailBarWidth), ThumbnailBarWidth);
-        //}
+        ThumbnailBarWidth = items.GetValue(nameof(ThumbnailBarWidth), ThumbnailBarWidth);
         #endregion
 
         ImageBoosterCacheCount = items.GetValue(nameof(ImageBoosterCacheCount), ImageBoosterCacheCount);
@@ -957,8 +967,7 @@ public static class Config
         ZoomMode = items.GetValue(nameof(ZoomMode), ZoomMode);
         ImageInterpolationScaleDown = items.GetValue(nameof(ImageInterpolationScaleDown), ImageInterpolationScaleDown);
         ImageInterpolationScaleUp = items.GetValue(nameof(ImageInterpolationScaleUp), ImageInterpolationScaleUp);
-        //ToolbarPosition = items.GetValue(nameof(ToolbarPosition), ToolbarPosition);
-        //AfterEditingAction = items.GetValue(nameof(AfterEditingAction), AfterEditingAction);
+        AfterEditingAction = items.GetValue(nameof(AfterEditingAction), AfterEditingAction);
         WindowBackdrop = items.GetValue(nameof(WindowBackdrop), WindowBackdrop);
 
         #endregion
@@ -972,6 +981,9 @@ public static class Config
 
         AutoUpdate = items.GetValue(nameof(AutoUpdate), AutoUpdate);
         LastSeenImagePath = items.GetValue(nameof(LastSeenImagePath), LastSeenImagePath);
+        DarkTheme = items.GetValue(nameof(DarkTheme), DarkTheme);
+        LightTheme = items.GetValue(nameof(LightTheme), LightTheme);
+
         //ExifToolExePath = items.GetValue(nameof(ExifToolExePath), ExifToolExePath);
         //ExifToolCommandArgs = items.GetValue(nameof(ExifToolCommandArgs), ExifToolCommandArgs);
 
@@ -983,8 +995,12 @@ public static class Config
 
         #region EditApps
 
-        //var appStr = items.GetValue(nameof(EditApps), "");
-        //EditApps = GetEditApps(appStr);
+        EditApps = items.GetSection(nameof(EditApps))
+            .GetChildren()
+            .ToDictionary(
+                i => i.Key.ToLowerInvariant(),
+                i => i.Get<EditApp>()
+            );
 
         #endregion
 
@@ -1005,7 +1021,7 @@ public static class Config
             .Select(i => i.Get<ToolbarItemModel>());
         ToolbarItems = toolbarItems.Any() ? toolbarItems.ToList() : DefaultToolbarItems;
 
-        
+
         // info items
         var infoItems = items.GetSection(nameof(InfoItems))
             .GetChildren()
@@ -1029,7 +1045,7 @@ public static class Config
             .ToDictionary(
                 i => BHelper.ParseEnum<MouseClickEvent>(i.Key),
                 i => i.Get<ToggleAction>());
-        
+
 
         // mouse wheel actions
         MouseWheelActions = items.GetSection(nameof(MouseWheelActions))
@@ -1037,6 +1053,27 @@ public static class Config
             .ToDictionary(
                 i => BHelper.ParseEnum<MouseWheelEvent>(i.Key),
                 i => BHelper.ParseEnum<MouseWheelAction>(i.Value));
+
+
+        // Layout
+        Layout = items.GetSection(nameof(Layout))
+            .GetChildren()
+            .ToDictionary(
+                i => i.Key,
+                i => i.Get<string>()
+            );
+
+
+        // Tools
+        var toolsList = items.GetSection(nameof(Tools))
+            .GetChildren()
+            .Select(i => i.Get<IgTool>())
+            .Where(i => i != null && !i.IsEmpty);
+        if (toolsList != null && toolsList.Any())
+        {
+            Tools.Clear();
+            Tools = toolsList.ToList();
+        }
 
         #endregion
 
@@ -1050,31 +1087,7 @@ public static class Config
         #endregion
 
 
-        #region Theme
-        var themeFolderName = items.GetValue(nameof(Theme), Constants.DEFAULT_THEME);
-        var th = new IgTheme(App.ConfigDir(PathType.Dir, Dir.Themes, themeFolderName));
-
-        if (th.IsValid)
-        {
-            Theme = th;
-        }
-        else
-        {
-            // load default theme
-            Theme = new(App.StartUpDir(Dir.Themes, Constants.DEFAULT_THEME));
-        }
-
-        if (!Theme.IsValid)
-        {
-            throw new InvalidDataException($"Unable to load '{th.FolderName}' theme pack. " +
-                $"Please make sure '{th.FolderName}\\{IgTheme.CONFIG_FILE}' file is valid.");
-        }
-
-        Theme.ReloadThemeColors();
-        #endregion
-
-
-        // must load after Theme
+        // must load before Theme
         #region BackgroundColor
 
         var bgValue = items.GetValue(nameof(BackgroundColor), string.Empty);
@@ -1088,6 +1101,10 @@ public static class Config
             BackgroundColor = ThemeUtils.ColorFromHex(bgValue);
         }
         #endregion
+
+
+        // load theme
+        LoadThemePack(WinColorsApi.IsDarkMode, true, true);
 
 
         #region SlideshowBackgroundColor
@@ -1105,6 +1122,77 @@ public static class Config
 
         // initialize Magick.NET
         PhotoCodec.InitMagickNET();
+    }
+
+
+    /// <summary>
+    /// Loads theme pack <see cref="Config.Theme"/> and only theme colors.
+    /// </summary>
+    /// <param name="darkMode">
+    /// Determine which theme should be loaded: <see cref="DarkTheme"/> or <see cref="LightTheme"/>.
+    /// </param>
+    /// <param name="useFallBackTheme">
+    /// If theme pack is invalid, should load the default theme pack <see cref="Constants.DEFAULT_THEME"/>?
+    /// </param>
+    /// <param name="throwIfThemeInvalid">
+    /// If theme pack is invalid, should throw exception?
+    /// </param>
+    /// <exception cref="InvalidDataException"></exception>
+    public static void LoadThemePack(bool darkMode, bool useFallBackTheme, bool throwIfThemeInvalid)
+    {
+        var themeFolderName = darkMode ? DarkTheme : LightTheme;
+        if (string.IsNullOrEmpty(themeFolderName))
+        {
+            themeFolderName = Constants.DEFAULT_THEME;
+        }
+
+        // theme pack is already updated
+        if (themeFolderName.Equals(Theme.FolderName, StringComparison.InvariantCultureIgnoreCase))
+        {
+            return;
+        }
+
+        var th = new IgTheme(App.ConfigDir(PathType.Dir, Dir.Themes, themeFolderName));
+
+        if (!th.IsValid)
+        {
+            if (useFallBackTheme)
+            {
+                th.Dispose();
+                th = null;
+
+                // load default theme
+                th = new(App.StartUpDir(Dir.Themes, Constants.DEFAULT_THEME));
+            }
+        }
+
+        if (!th.IsValid && throwIfThemeInvalid)
+        {
+            th.Dispose();
+            th = null;
+
+            throw new InvalidDataException($"Unable to load '{th.FolderName}' theme pack. " +
+                $"Please make sure '{th.FolderName}\\{IgTheme.CONFIG_FILE}' file is valid.");
+        }
+
+        // update the name of dark/light theme
+        if (darkMode) DarkTheme = th.FolderName;
+        else LightTheme = th.FolderName;
+
+
+        // load theme colors
+        th.ReloadThemeColors();
+
+        // load background color
+        if (Config.BackgroundColor == Theme.Colors.BgColor)
+        {
+            Config.BackgroundColor = th.Colors.BgColor;
+        }
+
+
+        // set to the current theme
+        Theme?.Dispose();
+        Theme = th;
     }
 
 
@@ -1148,8 +1236,8 @@ public static class Config
         var url = "https://imageglass.org/docs/command-line-utilities";
         var langPath = $"_._IgCommandExe._DefaultError";
 
-        var result = ShowError(
-            title: Application.ProductName + " " + Application.ProductVersion,
+        var result = ShowError(null,
+            title: Application.ProductName + " v" + Application.ProductVersion,
             heading: Language[$"{langPath}._Heading"],
             description: string.Format(Language[$"{langPath}._Description"], url),
             buttons: PopupButton.LearnMore_Close);
@@ -1180,14 +1268,14 @@ public static class Config
             $"Release code: {Constants.APP_CODE}\r\n" +
             $"OS: {osInfo}\r\n\r\n" +
 
-            $"-------------------------------------------------------------\r\n" +
+            $"----------------------------------------------------\r\n" +
             $"Error:\r\n\r\n" +
             $"{ex.Message}\r\n" +
-            $"-------------------------------------------------------------\r\n\r\n" +
+            $"----------------------------------------------------\r\n\r\n" +
 
             ex.ToString();
 
-        var result = ShowError(
+        var result = ShowError(null,
             title: Application.ProductName + " - " + Language[langPath],
             heading: ex.Message,
             description: description,
@@ -1212,6 +1300,7 @@ public static class Config
     /// <param name="note">Note text.</param>
     /// <param name="buttons">Popup buttons.</param>
     public static PopupResult ShowInfo(
+        Form? formOwner,
         string description = "",
         string title = "",
         string heading = "",
@@ -1220,12 +1309,11 @@ public static class Config
         SHSTOCKICONID? icon = SHSTOCKICONID.SIID_INFO,
         Image? thumbnail = null,
         PopupButton buttons = PopupButton.OK,
-        string optionText = "",
-        Form? formOwner = null)
+        string optionText = "")
     {
         SystemSounds.Question.Play();
 
-        return Popup.ShowDialog(Theme, Language, description, title, heading, details, note, StatusType.Info, buttons, icon, thumbnail, optionText, Config.EnableWindowTopMost, formOwner);
+        return Popup.ShowDialog(description, title, heading, details, note, StatusType.Info, buttons, icon, thumbnail, optionText, Config.EnableWindowTopMost, formOwner);
     }
 
 
@@ -1239,6 +1327,7 @@ public static class Config
     /// <param name="note">Note text.</param>
     /// <param name="buttons">Popup buttons.</param>
     public static PopupResult ShowWarning(
+        Form? formOwner,
         string description = "",
         string title = "",
         string? heading = null,
@@ -1247,13 +1336,12 @@ public static class Config
         SHSTOCKICONID? icon = SHSTOCKICONID.SIID_WARNING,
         Image? thumbnail = null,
         PopupButton buttons = PopupButton.OK,
-        string optionText = "",
-        Form? formOwner = null)
+        string optionText = "")
     {
         heading ??= Language["_._Warning"];
         SystemSounds.Exclamation.Play();
 
-        return Popup.ShowDialog(Theme, Language, description, title, heading, details, note, StatusType.Warning, buttons, icon, thumbnail, optionText, Config.EnableWindowTopMost, formOwner);
+        return Popup.ShowDialog(description, title, heading, details, note, StatusType.Warning, buttons, icon, thumbnail, optionText, Config.EnableWindowTopMost, formOwner);
     }
 
 
@@ -1267,6 +1355,7 @@ public static class Config
     /// <param name="note">Note text.</param>
     /// <param name="buttons">Popup buttons.</param>
     public static PopupResult ShowError(
+        Form? formOwner,
         string description = "",
         string title = "",
         string? heading = null,
@@ -1275,13 +1364,12 @@ public static class Config
         SHSTOCKICONID? icon = SHSTOCKICONID.SIID_ERROR,
         Image? thumbnail = null,
         PopupButton buttons = PopupButton.OK,
-        string optionText = "",
-        Form? formOwner = null)
+        string optionText = "")
     {
         heading ??= Language["_._Error"];
         SystemSounds.Asterisk.Play();
 
-        return Popup.ShowDialog(Theme, Language, description, title, heading, details, note, StatusType.Danger, buttons, icon, thumbnail, optionText, Config.EnableWindowTopMost, formOwner);
+        return Popup.ShowDialog(description, title, heading, details, note, StatusType.Danger, buttons, icon, thumbnail, optionText, Config.EnableWindowTopMost, formOwner);
     }
 
 
@@ -1312,8 +1400,9 @@ public static class Config
         settings.TryAdd(nameof(HideFrmMainInSlideshow), HideFrmMainInSlideshow);
         settings.TryAdd(nameof(ShowSlideshowCountdown), ShowSlideshowCountdown);
         settings.TryAdd(nameof(UseRandomIntervalForSlideshow), UseRandomIntervalForSlideshow);
-        settings.TryAdd(nameof(LoopSlideshow), LoopSlideshow);
-        settings.TryAdd(nameof(UseWindowedSlideshow), UseWindowedSlideshow);
+        settings.TryAdd(nameof(ShouldLoopSlideshow), ShouldLoopSlideshow);
+        settings.TryAdd(nameof(EnableWindowedSlideshow), EnableWindowedSlideshow);
+        settings.TryAdd(nameof(EnableFrameless), EnableFrameless);
         settings.TryAdd(nameof(EnableFullScreen), EnableFullScreen);
         settings.TryAdd(nameof(ShowThumbnails), ShowThumbnails);
         settings.TryAdd(nameof(ShowThumbnailScrollbars), ShowThumbnailScrollbars);
@@ -1326,33 +1415,29 @@ public static class Config
         //settings.TryAdd(nameof(IsShowWelcome), IsShowWelcome);
         settings.TryAdd(nameof(ShowToolbar), ShowToolbar);
         settings.TryAdd(nameof(EnableLoopBackNavigation), EnableLoopBackNavigation);
-        //settings.TryAdd(nameof(EnablePressESCToQuit), EnablePressESCToQuit);
         settings.TryAdd(nameof(ShowCheckerBoard), ShowCheckerBoard);
         settings.TryAdd(nameof(EnableMultiInstances), EnableMultiInstances);
         settings.TryAdd(nameof(EnableWindowTopMost), EnableWindowTopMost);
-        //settings.TryAdd(nameof(IsWindowFrameless), IsWindowFrameless);
-        //settings.TryAdd(nameof(IsThumbnailHorizontal), IsThumbnailHorizontal);
         settings.TryAdd(nameof(ShowDeleteConfirmation), ShowDeleteConfirmation);
         settings.TryAdd(nameof(ShowSaveOverrideConfirmation), ShowSaveOverrideConfirmation);
         //settings.TryAdd(nameof(IsScrollbarsVisible), IsScrollbarsVisible);
         //settings.TryAdd(nameof(IsSaveAfterRotating), IsSaveAfterRotating);
-        settings.TryAdd(nameof(PreserveModifiedDate), PreserveModifiedDate);
-        settings.TryAdd(nameof(IsNewVersionAvailable), IsNewVersionAvailable);
-        //settings.TryAdd(nameof(IsDisplayBasenameOfImage), IsDisplayBasenameOfImage);
-        settings.TryAdd(nameof(CenterToolbar), CenterToolbar);
-        settings.TryAdd(nameof(OpenLastSeenImage), OpenLastSeenImage);
-        settings.TryAdd(nameof(ApplyColorProfileForAll), ApplyColorProfileForAll);
+        settings.TryAdd(nameof(ShouldPreserveModifiedDate), ShouldPreserveModifiedDate);
+        settings.TryAdd(nameof(ShowNewVersionIndicator), ShowNewVersionIndicator);
+        settings.TryAdd(nameof(EnableCenterToolbar), EnableCenterToolbar);
+        settings.TryAdd(nameof(ShouldOpenLastSeenImage), ShouldOpenLastSeenImage);
+        settings.TryAdd(nameof(ShouldUseColorProfileForAll), ShouldUseColorProfileForAll);
         settings.TryAdd(nameof(EnableNavigationButtons), EnableNavigationButtons);
         settings.TryAdd(nameof(ShowCheckerboardOnlyImageRegion), ShowCheckerboardOnlyImageRegion);
         settings.TryAdd(nameof(EnableRecursiveLoading), EnableRecursiveLoading);
-        settings.TryAdd(nameof(UseFileExplorerSortOrder), UseFileExplorerSortOrder);
-        settings.TryAdd(nameof(GroupImagesByDirectory), GroupImagesByDirectory);
-        settings.TryAdd(nameof(IncludeHiddenImages), IncludeHiddenImages);
+        settings.TryAdd(nameof(ShouldUseExplorerSortOrder), ShouldUseExplorerSortOrder);
+        settings.TryAdd(nameof(ShouldGroupImagesByDirectory), ShouldGroupImagesByDirectory);
+        settings.TryAdd(nameof(ShouldLoadHiddenImages), ShouldLoadHiddenImages);
         //settings.TryAdd(nameof(IsShowColorPickerOnStartup), IsShowColorPickerOnStartup);
         //settings.TryAdd(nameof(IsShowPageNavOnStartup), IsShowPageNavOnStartup);
         //settings.TryAdd(nameof(IsShowPageNavAuto), IsShowPageNavAuto);
-        //settings.TryAdd(nameof(IsWindowFit), IsWindowFit);
-        //settings.TryAdd(nameof(IsCenterWindowFit), IsCenterWindowFit);
+        settings.TryAdd(nameof(EnableWindowFit), EnableWindowFit);
+        settings.TryAdd(nameof(CenterWindowFit), CenterWindowFit);
         //settings.TryAdd(nameof(IsUseTouchGesture), IsUseTouchGesture);
         //settings.TryAdd(nameof(IsHideTooltips), IsHideTooltips);
         //settings.TryAdd(nameof(IsExifToolAlwaysOnTop), IsExifToolAlwaysOnTop);
@@ -1363,6 +1448,8 @@ public static class Config
         settings.TryAdd(nameof(EnableImageTransition), EnableImageTransition);
         settings.TryAdd(nameof(EnableCopyMultipleFiles), EnableCopyMultipleFiles);
         settings.TryAdd(nameof(EnableCutMultipleFiles), EnableCutMultipleFiles);
+        settings.TryAdd(nameof(EnableFileWatcher), EnableFileWatcher);
+        settings.TryAdd(nameof(ShouldAutoOpenNewAddedImage), ShouldAutoOpenNewAddedImage);
 
         settings.TryAdd(nameof(HideToolbarInFullscreen), HideToolbarInFullscreen);
         settings.TryAdd(nameof(HideThumbnailsInFullscreen), HideThumbnailsInFullscreen);
@@ -1398,7 +1485,7 @@ public static class Config
         settings.TryAdd(nameof(SlideshowIntervalTo), SlideshowIntervalTo);
         settings.TryAdd(nameof(ThumbnailSize), ThumbnailSize);
         settings.TryAdd(nameof(ThumbnailCacheSizeInMb), ThumbnailCacheSizeInMb);
-        //settings.TryAdd(nameof(ThumbnailBarWidth), ThumbnailBarWidth);
+        settings.TryAdd(nameof(ThumbnailBarWidth), ThumbnailBarWidth);
         settings.TryAdd(nameof(ImageBoosterCacheCount), ImageBoosterCacheCount);
         settings.TryAdd(nameof(ImageBoosterCacheMaxDimension), ImageBoosterCacheMaxDimension);
         settings.TryAdd(nameof(ImageBoosterCacheMaxFileSizeInMb), ImageBoosterCacheMaxFileSizeInMb);
@@ -1422,8 +1509,7 @@ public static class Config
         settings.TryAdd(nameof(ZoomMode), ZoomMode.ToString());
         settings.TryAdd(nameof(ImageInterpolationScaleDown), ImageInterpolationScaleDown);
         settings.TryAdd(nameof(ImageInterpolationScaleUp), ImageInterpolationScaleUp);
-        //settings.TryAdd(nameof(ToolbarPosition), ToolbarPosition.ToString());
-        //settings.TryAdd(nameof(AfterEditingAction), AfterEditingAction.ToString());
+        settings.TryAdd(nameof(AfterEditingAction), AfterEditingAction.ToString());
         settings.TryAdd(nameof(WindowBackdrop), WindowBackdrop);
 
         #endregion
@@ -1434,6 +1520,8 @@ public static class Config
         settings.TryAdd(nameof(ColorProfile), ColorProfile);
         settings.TryAdd(nameof(AutoUpdate), AutoUpdate);
         settings.TryAdd(nameof(LastSeenImagePath), LastSeenImagePath);
+        settings.TryAdd(nameof(DarkTheme), DarkTheme);
+        settings.TryAdd(nameof(LightTheme), LightTheme);
         //settings.TryAdd(nameof(ExifToolExePath), ExifToolExePath);
         //settings.TryAdd(nameof(ExifToolCommandArgs), ExifToolCommandArgs);
 
@@ -1445,14 +1533,13 @@ public static class Config
         settings.TryAdd(nameof(BackgroundColor), ThemeUtils.ColorToHex(BackgroundColor));
         settings.TryAdd(nameof(SlideshowBackgroundColor), ThemeUtils.ColorToHex(SlideshowBackgroundColor));
         settings.TryAdd(nameof(Language), Path.GetFileName(Language.FileName));
-        settings.TryAdd(nameof(Theme), Theme.FolderName);
 
         #endregion
 
 
         #region Array items
 
-        //settings.TryAdd(nameof(EditApps), GetEditApps(EditApps));
+        settings.TryAdd(nameof(EditApps), EditApps);
         settings.TryAdd(nameof(AllFormats), GetImageFormats(AllFormats));
         settings.TryAdd(nameof(SinglePageFormats), GetImageFormats(SinglePageFormats));
         settings.TryAdd(nameof(InfoItems), InfoItems);
@@ -1460,11 +1547,14 @@ public static class Config
         settings.TryAdd(nameof(MouseClickActions), MouseClickActions);
         settings.TryAdd(nameof(MouseWheelActions), MouseWheelActions);
         settings.TryAdd(nameof(ToolbarItems), ToolbarItems);
+        settings.TryAdd(nameof(Layout), Layout);
+        settings.TryAdd(nameof(Tools), Tools);
+
         #endregion
 
 
         // Tools' settings
-        settings.TryAdd(nameof(Tools), (object)Tools);
+        settings.TryAdd(nameof(ToolSettings), (object)ToolSettings);
 
         return settings;
     }
@@ -1636,7 +1726,7 @@ public static class Config
         return hotkeyList ?? new List<Hotkey>(0);
     }
 
-    
+
     /// <summary>
     /// Gets hotkey's KeyData.
     /// </summary>
@@ -1648,7 +1738,7 @@ public static class Config
         return keyDataList ?? new List<Keys>(1) { defaultValue };
     }
 
-    
+
     /// <summary>
     /// Gets actions from the input hotkey.
     /// </summary>

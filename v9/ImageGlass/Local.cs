@@ -18,11 +18,10 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 using ImageGlass.Base;
-using ImageGlass.Base.NamedPipes;
 using ImageGlass.Base.Photoing.Codecs;
 using ImageGlass.Base.Services;
 using ImageGlass.Settings;
-using ImageGlass.UI;
+using ImageGlass.Tools;
 using System.IO.Pipes;
 using WicNet;
 
@@ -38,37 +37,43 @@ internal class Local
     /// <summary>
     /// Occurs when <see cref="Images"/> is loaded.
     /// </summary>
-    public static event ImageListLoadedHandler? OnImageListLoaded;
+    public static event ImageListLoadedHandler? ImageListLoaded;
     public delegate void ImageListLoadedHandler(ImageListLoadedEventArgs e);
 
     /// <summary>
     /// Occurs when the requested image is being loaded.
     /// </summary>
-    public static event ImageLoadingHandler? OnImageLoading;
+    public static event ImageLoadingHandler? ImageLoading;
     public delegate void ImageLoadingHandler(ImageLoadingEventArgs e);
 
     /// <summary>
     /// Occurs when the requested image is loaded.
     /// </summary>
-    public static event ImageLoadedHandler? OnImageLoaded;
+    public static event ImageLoadedHandler? ImageLoaded;
     public delegate void ImageLoadedHandler(ImageLoadedEventArgs e);
+
+    /// <summary>
+    /// Occurs when the image is unloaded.
+    /// </summary>
+    public static event ImageUnloadedHandler? ImageUnloaded;
+    public delegate void ImageUnloadedHandler(ImageUnloadedEventArgs e);
 
     /// <summary>
     /// Occurs when the first image is reached.
     /// </summary>
-    public static event FirstImageReachedHandler? OnFirstImageReached;
+    public static event FirstImageReachedHandler? FirstImageReached;
     public delegate void FirstImageReachedHandler();
 
     /// <summary>
     /// Occurs when the last image is reached.
     /// </summary>
-    public static event LastImageReachedHandler? OnLastImageReached;
+    public static event LastImageReachedHandler? LastImageReached;
     public delegate void LastImageReachedHandler();
 
     /// <summary>
     /// Occurs when the FrmMain's state needs to be updated.
     /// </summary>
-    public static event FrmMainUpdateRequestedHandler? OnRequestUpdateFrmMain;
+    public static event FrmMainUpdateRequestedHandler? RequestUpdateFrmMain;
     public delegate void FrmMainUpdateRequestedHandler(UpdateRequests e);
 
     /// <summary>
@@ -79,56 +84,77 @@ internal class Local
 
 
     /// <summary>
-    /// Raise <see cref="OnImageListLoaded"/> event.
+    /// Raise <see cref="ImageListLoaded"/> event.
     /// </summary>
     public static void RaiseImageListLoadedEvent(ImageListLoadedEventArgs e)
     {
-        OnImageListLoaded?.Invoke(e);
+        ImageListLoaded?.Invoke(e);
+
+        // emit event to all tools
+        _ = BroadcastMessageToAllToolServersAsync(ToolServerMsgs.IMAGE_LIST_UPDATED, e);
     }
 
 
     /// <summary>
-    /// Raise <see cref="OnImageLoading"/> event.
+    /// Raise <see cref="ImageLoading"/> event.
     /// </summary>
     public static void RaiseImageLoadingEvent(ImageLoadingEventArgs e)
     {
-        OnImageLoading?.Invoke(e);
+        ImageLoading?.Invoke(e);
+
+        // emit event to all tools
+        _ = BroadcastMessageToAllToolServersAsync(ToolServerMsgs.IMAGE_LOADING, e);
     }
 
 
     /// <summary>
-    /// Raise <see cref="OnImageLoaded"/> event.
+    /// Raise <see cref="ImageLoaded"/> event.
     /// </summary>
     public static void RaiseImageLoadedEvent(ImageLoadedEventArgs e)
     {
-        OnImageLoaded?.Invoke(e);
+        ImageLoaded?.Invoke(e);
+
+        // emit event to all tools
+        _ = BroadcastMessageToAllToolServersAsync(ToolServerMsgs.IMAGE_LOADED, e);
     }
 
 
     /// <summary>
-    /// Raise <see cref="OnFirstImageReached"/> event.
+    /// Raise <see cref="ImageUnloaded"/> event.
+    /// </summary>
+    public static void RaiseImageUnloadedEvent(ImageUnloadedEventArgs e)
+    {
+        ImageUnloaded?.Invoke(e);
+
+        // emit event to all tools
+        _ = BroadcastMessageToAllToolServersAsync(ToolServerMsgs.IMAGE_UNLOADED, e);
+    }
+
+
+    /// <summary>
+    /// Raise <see cref="FirstImageReached"/> event.
     /// </summary>
     public static void RaiseFirstImageReachedEvent()
     {
-        OnFirstImageReached?.Invoke();
+        FirstImageReached?.Invoke();
     }
 
 
     /// <summary>
-    /// Raise <see cref="OnLastImageReached"/> event.
+    /// Raise <see cref="LastImageReached"/> event.
     /// </summary>
     public static void RaiseLastImageReachedEvent()
     {
-        OnLastImageReached?.Invoke();
+        LastImageReached?.Invoke();
     }
 
 
     /// <summary>
-    /// Raise <see cref="OnRequestUpdateFrmMain"/> event.
+    /// Raise <see cref="RequestUpdateFrmMain"/> event.
     /// </summary>
     public static void UpdateFrmMain(UpdateRequests e)
     {
-        OnRequestUpdateFrmMain?.Invoke(e);
+        RequestUpdateFrmMain?.Invoke(e);
     }
 
 
@@ -149,12 +175,17 @@ internal class Local
     /// <summary>
     /// Gets, sets the tools.
     /// </summary>
-    public static Dictionary<string, ModernForm?> Tools { get; set; } = new();
+    public static Dictionary<string, ToolForm?> Tools { get; set; } = new();
 
     /// <summary>
     /// Gets, sets the list of slideshow pipe servers.
     /// </summary>
     public static List<PipeServer?> SlideshowPipeServers { get; set; } = new();
+
+    /// <summary>
+    /// Gets, sets the list of tool pipe servers.
+    /// </summary>
+    public static Dictionary<string, PipeServer?> ToolPipeServers { get; set; } = new();
 
     /// <summary>
     /// Gets, sets the metadata of the current image in the list.
@@ -179,7 +210,7 @@ internal class Local
     /// <summary>
     /// Gets, sets the changes of the current viewing image.
     /// </summary>
-    public static IgImgChanges CurrentChanges = new();
+    public static ImgTransform ImageTransform = new();
 
 
     /// <summary>
@@ -291,7 +322,7 @@ internal class Local
         {
             try
             {
-                await PhotoCodec.SaveAsync(ClipboardImage, filename, quality.Value);
+                await PhotoCodec.SaveAsync(ClipboardImage, filename, Local.ImageTransform, quality.Value);
 
                 TempImagePath = filename;
             }
@@ -310,7 +341,7 @@ internal class Local
         {
             try
             {
-                await PhotoCodec.SaveAsync(img.ImgData.Image, filename, quality.Value);
+                await PhotoCodec.SaveAsync(img.ImgData.Image, filename, Local.ImageTransform, quality.Value);
 
                 TempImagePath = filename;
             }
@@ -323,7 +354,113 @@ internal class Local
         return TempImagePath;
     }
 
-    
+
+    /// <summary>
+    /// Sends message to all tool servers
+    /// </summary>
+    public static async Task BroadcastMessageToAllToolServersAsync(string msgName, object? data)
+    {
+        if (Local.ToolPipeServers.Count == 0) return;
+        var msgData = BHelper.ToJson(data ?? "") ?? "";
+
+        // emit event to all tools
+        await Parallel.ForEachAsync(
+            Local.ToolPipeServers,
+            new ParallelOptions() { MaxDegreeOfParallelism = 20 },
+            async (server, token) =>
+            {
+                if (server.Value is PipeServer tool)
+                {
+                    await tool.SendAsync(msgName, msgData);
+                }
+            });
+    }
+
+    /// <summary>
+    /// Opens tool as a <see cref="PipeServer"/>.
+    /// </summary>
+    public static async Task OpenPipedToolAsync(IgTool? tool)
+    {
+        if (tool == null || tool.IsEmpty
+            || Local.ToolPipeServers.ContainsKey(tool.ToolId)) return;
+
+        // prepend tool prefix to create pipe name
+        var pipeName = $"{ImageGlassTool.PIPENAME_PREFIX}{tool.Executable}";
+
+        // create a new tool server
+        var toolServer = new PipeServer(pipeName, PipeDirection.InOut);
+        toolServer.ClientDisconnected += ToolServer_ClientDisconnected;
+        Local.ToolPipeServers.Add(tool.ToolId, toolServer);
+
+        // start the server
+        toolServer.Start();
+        await Config.WriteAsync();
+
+        // start tool client
+        var filePath = Local.Images.GetFilePath(Local.CurrentIndex);
+        var args = tool.Argument?.Replace(Constants.FILE_MACRO, $"\"{filePath}\"");
+        _ = BHelper.RunExeCmd($"{tool.Executable}", $"-EnableWindowTopMost={Config.EnableWindowTopMost} {args}", false);
+
+        // wait for client connection
+        await toolServer.WaitForConnectionAsync();
+    }
+
+
+    private static void ToolServer_ClientDisconnected(object? sender, DisconnectedEventArgs e)
+    {
+        if (FrmMain.InvokeRequired)
+        {
+            FrmMain.Invoke(delegate
+            {
+                ToolServer_ClientDisconnected(sender, e);
+            });
+            return;
+        }
+
+        // get tool info
+        var item = Local.ToolPipeServers.FirstOrDefault(i => i.Value.PipeName
+            .Equals(e.PipeName, StringComparison.InvariantCultureIgnoreCase));
+
+        var toolId = item.Key;
+        var toolServer = item.Value;
+
+        // update menu state
+        if (FrmMain.MnuTools.DropDownItems[toolId] is ToolStripMenuItem mnuItem)
+        {
+            mnuItem.Checked = false;
+        }
+
+        // remove events
+        toolServer.Stop();
+        toolServer.ClientDisconnected -= ToolServer_ClientDisconnected;
+        toolServer.Dispose();
+        toolServer = null;
+
+        // remove tool server
+        Local.ToolPipeServers.Remove(toolId);
+    }
+
+
+    /// <summary>
+    /// Closes <see cref="PipeServer"/> tool.
+    /// </summary>
+    public static async Task ClosePipedToolAsync(IgTool? tool)
+    {
+        if (tool == null
+            || !Local.ToolPipeServers.TryGetValue(tool.ToolId, out var toolServer)
+            || toolServer is not PipeServer) return;
+
+        if (toolServer.ServerStream.IsConnected)
+        {
+            await toolServer.SendAsync(ToolServerMsgs.TOOL_TERMINATE);
+
+            // wait for 3 seconds for client to disconnect
+            await Task.Delay(3000);
+        }
+
+        // remove tool server
+        ToolServer_ClientDisconnected(null, new DisconnectedEventArgs(toolServer.PipeName));
+    }
 
     #endregion
 

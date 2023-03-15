@@ -17,6 +17,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 using DirectN;
+using ImageGlass.WebP;
 using ImageMagick;
 using ImageMagick.Formats;
 using System.Runtime.CompilerServices;
@@ -50,6 +51,7 @@ public static class PhotoCodec
         }
         catch { }
         if (fi == null) return meta;
+        var ext = fi.Extension.ToLowerInvariant();
 
         meta.FileName = fi.Name;
         meta.FileExtension = fi.Extension.ToUpperInvariant();
@@ -83,9 +85,9 @@ public static class PhotoCodec
             if (imgC.Count > 0)
             {
                 using var imgM = imgC[0];
-                var exifProfile = imgM.GetExifProfile();
 
-                if (exifProfile != null)
+                // EXIF profile
+                if (imgM.GetExifProfile() is IExifProfile exifProfile)
                 {
                     // ExifRatingPercent
                     meta.ExifRatingPercent = GetExifValue(exifProfile, ExifTag.RatingPercent);
@@ -97,7 +99,6 @@ public static class PhotoCodec
                     // ExifDateTime
                     dt = GetExifValue(exifProfile, ExifTag.DateTime);
                     meta.ExifDateTime = BHelper.ConvertDateTime(dt);
-
 
                     meta.ExifArtist = GetExifValue(exifProfile, ExifTag.Artist);
                     meta.ExifCopyright = GetExifValue(exifProfile, ExifTag.Copyright);
@@ -122,6 +123,12 @@ public static class PhotoCodec
                         : rational.Numerator / rational.Denominator;
                 }
 
+                // Color profile
+                if (imgM.GetColorProfile() is IColorProfile colorProfile)
+                {
+                    meta.ColorProfile = colorProfile.ColorSpace.ToString();
+                }
+
                 meta.Width = imgM.Width;
                 meta.Height = imgM.Height;
 
@@ -129,32 +136,14 @@ public static class PhotoCodec
                 meta.OriginalHeight = imgM.BaseHeight;
 
                 meta.HasAlpha = imgC.Any(i => i.HasAlpha);
-                meta.CanAnimate = imgC.Count > 1 && imgC.Any(i => i.AnimationDelay > 0);
+                meta.CanAnimate = imgC.Count > 1
+                    && imgC.Any(i => i.GifDisposeMethod != GifDisposeMethod.Undefined);
+                meta.ColorSpace = imgM.ColorSpace.ToString();
             }
         }
         catch { }
 
         return meta;
-    }
-
-
-    /// <summary>
-    /// Loads image file.
-    /// </summary>
-    /// <param name="filePath">Full path of the file</param>
-    /// <param name="options">Loading options</param>
-    public static IgImgData Load(string filePath, CodecReadOptions? options = null, IgImgChanges? changes = null)
-    {
-        options ??= new();
-
-        var (loadSuccessful, result, ext, settings) = ReadWithStream(filePath, options, changes);
-
-        if (!loadSuccessful)
-        {
-            result = LoadWithMagickImage(filePath, ext, settings, options);
-        }
-
-        return result;
     }
 
 
@@ -165,7 +154,7 @@ public static class PhotoCodec
     /// <param name="options">Loading options</param>
     /// <param name="token">Cancellation token</param>
     public static async Task<IgImgData> LoadAsync(string filePath,
-        CodecReadOptions? options = null, IgImgChanges? changes = null,
+        CodecReadOptions? options = null, ImgTransform? transform = null,
         CancellationToken? token = null)
     {
         options ??= new();
@@ -173,11 +162,11 @@ public static class PhotoCodec
 
         try
         {
-            var (loadSuccessful, result, ext, settings) = ReadWithStream(filePath, options, changes);
+            var (loadSuccessful, result, ext, settings) = ReadWithStream(filePath, options, transform);
 
             if (!loadSuccessful)
             {
-                result = await LoadWithMagickImageAsync(filePath, ext, settings, options, changes, cancelToken);
+                result = await LoadWithMagickImageAsync(filePath, ext, settings, options, transform, cancelToken);
             }
 
             return result;
@@ -210,7 +199,7 @@ public static class PhotoCodec
         var ext = Path.GetExtension(filePath).ToLower();
 
 
-        var imgData = ReadMagickImage(filePath, ext, settings, options);
+        var imgData = BHelper.RunSync(() => ReadMagickImageAsync(filePath, ext, settings, options, null, new()));
 
         if (imgData?.SingleFrameImage != null)
         {
@@ -240,7 +229,7 @@ public static class PhotoCodec
         using var imgM = new MagickImage();
         imgM.Ping(filePath, settings);
 
-        
+
         // get RAW embedded thumbnail
         if (rawThumbnail)
         {
@@ -260,7 +249,7 @@ public static class PhotoCodec
             catch (OperationCanceledException) { return null; }
             catch { }
         }
-        
+
 
 
         // Use JPEG embedded thumbnail
@@ -318,7 +307,7 @@ public static class PhotoCodec
         var svg = string.Empty;
         using var fs = new StreamReader(svgFilePath);
         svg = fs.ReadToEnd();
-        
+
 
         if (darkMode)
         {
@@ -358,21 +347,23 @@ public static class PhotoCodec
     /// <param name="srcFileName">Source filename to save</param>
     /// <param name="destFilePath">Destination filename</param>
     /// <param name="readOptions">Options for reading image file</param>
-    /// <param name="changes">Changes for writing image file</param>
+    /// <param name="transform">Changes for writing image file</param>
     /// <param name="quality">Quality</param>
-    public static async Task SaveAsync(string srcFileName, string destFilePath, CodecReadOptions readOptions, IgImgChanges? changes = null, int quality = 100, CancellationToken token = default)
+    public static async Task SaveAsync(string srcFileName, string destFilePath, CodecReadOptions readOptions, ImgTransform? transform = null, int quality = 100, CancellationToken token = default)
     {
-        changes ??= new();
-
         try
         {
             var settings = ParseSettings(readOptions, srcFileName);
-            using var imgData = await ReadMagickImageAsync(srcFileName, Path.GetExtension(srcFileName), settings, readOptions with
-            {
-                // Magick.NET auto-corrects the rotation when saving,
-                // so we don't need to correct it manually.
-                CorrectRotation = false,
-            }, changes, token);
+            using var imgData = await ReadMagickImageAsync(
+                srcFileName,
+                Path.GetExtension(srcFileName),
+                settings,
+                readOptions with
+                {
+                    // Magick.NET auto-corrects the rotation when saving,
+                    // so we don't need to correct it manually.
+                    CorrectRotation = false,
+                }, transform, token);
 
             if (imgData.MultiFrameImage != null)
             {
@@ -390,79 +381,39 @@ public static class PhotoCodec
 
 
     /// <summary>
-    /// Save as image file, use WIC if the extension is supported, else use Magick.NET.
-    /// </summary>
-    /// <param name="srcBitmap">Source bitmap to save</param>
-    /// <param name="destFilePath">Destination file path</param>
-    /// <param name="quality">JPEG/MIFF/PNG compression level</param>
-    public static async Task SaveAsync(WicBitmapSource? srcBitmap, string destFilePath, int quality = 100, CancellationToken token = default)
-    {
-        if (srcBitmap == null) return;
-
-
-        try
-        {
-            token.ThrowIfCancellationRequested();
-
-            var wicEncoder = WicEncoder.FromFileExtension(Path.GetExtension(destFilePath));
-            if (wicEncoder == null)
-            {
-                // use Magick.NET for saving
-                await SaveAsync(srcBitmap, destFilePath, format: MagickFormat.Unknown, quality: quality, token);
-
-                return;
-            }
-
-
-            // set saving options for WIC
-            var encoderOptions = new List<KeyValuePair<string, object>>();
-            if (quality == 100)
-            {
-                encoderOptions.Add(new("Lossless", true));
-            }
-            else
-            {
-                encoderOptions.Add(new("ImageQuality", quality / 100f));
-            }
-
-
-            using var stream = new FileStream(destFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite);
-
-            await Task.Run(() => srcBitmap.Save(stream, wicEncoder.ContainerFormat, encoderOptions: encoderOptions), token);
-        }
-        catch (OperationCanceledException) { }
-    }
-
-
-    /// <summary>
     /// Save as image file, use Magick.NET.
     /// </summary>
     /// <param name="srcBitmap">Source bitmap to save</param>
     /// <param name="destFilePath">Destination file path</param>
-    /// <param name="format">New image format</param>
+    /// <param name="transform">Image transformation</param>
     /// <param name="quality">JPEG/MIFF/PNG compression level</param>
-    public static async Task SaveAsync(WicBitmapSource? srcBitmap, string destFilePath, MagickFormat format = MagickFormat.Unknown, int quality = 100, CancellationToken token = default)
+    /// <param name="format">New image format</param>
+    public static async Task SaveAsync(WicBitmapSource? srcBitmap, string destFilePath, ImgTransform? transform = null, int quality = 100, MagickFormat format = MagickFormat.Unknown, CancellationToken token = default)
     {
         if (srcBitmap == null) return;
 
-
         try
         {
+            // convert to Bitmap
             token.ThrowIfCancellationRequested();
-
             using var bitmap = BHelper.ToGdiPlusBitmap(srcBitmap);
             if (bitmap == null) return;
 
+            // convert to MagickImage
             using var imgM = new MagickImage();
-
             await Task.Run(() =>
             {
                 imgM.Read(bitmap);
                 imgM.Quality = quality;
             }, token);
 
-            token.ThrowIfCancellationRequested();
 
+            // transform image
+            token.ThrowIfCancellationRequested();
+            TransformImage(imgM, transform);
+
+            // write image data to file
+            token.ThrowIfCancellationRequested();
             if (format != MagickFormat.Unknown)
             {
                 await imgM.WriteAsync(destFilePath, format, token);
@@ -477,52 +428,27 @@ public static class PhotoCodec
 
 
     /// <summary>
-    /// Save as image file, use Magick.NET.
+    /// Exports image frames to files, using Magick.NET
     /// </summary>
-    /// <param name="srcBitmap">Source bitmap to save</param>
-    /// <param name="destFilePath">Destination file path</param>
-    /// <param name="format">New image format</param>
-    /// <param name="quality">JPEG/MIFF/PNG compression level</param>
-    public static void Save(WicBitmapSource? srcBitmap, string destFilePath, MagickFormat format = MagickFormat.Unknown, int quality = 100)
-    {
-        if (srcBitmap == null) return;
-
-        using var imgM = new MagickImage();
-        imgM.Read(srcBitmap.CopyPixels(0, 0, srcBitmap.Width, srcBitmap.Height));
-        imgM.Quality = quality;
-
-        if (format != MagickFormat.Unknown)
-        {
-            imgM.Write(destFilePath, format);
-        }
-        else
-        {
-            imgM.Write(destFilePath);
-        }
-    }
-
-
-    /// <summary>
-    /// Save image pages to files, using Magick.NET
-    /// </summary>
-    /// <param name="filename">The full path of source file</param>
+    /// <param name="srcFilePath">The full path of source file</param>
     /// <param name="destFolder">The destination folder to save to</param>
-    public static async IAsyncEnumerable<int> SaveFramesAsync(string filename, string destFolder, [EnumeratorCancellation] CancellationToken token = default)
+    public static async IAsyncEnumerable<(int FrameNumber, string FileName)> SaveFramesAsync(string srcFilePath, string destFolder, [EnumeratorCancellation] CancellationToken token = default)
     {
         // create dirs unless it does not exist
         Directory.CreateDirectory(destFolder);
 
-        using var imgColl = new MagickImageCollection(filename);
+        using var imgColl = new MagickImageCollection(srcFilePath);
         var index = 0;
 
         foreach (var imgM in imgColl)
         {
             index++;
             imgM.Quality = 100;
+            var newFilename = string.Empty;
 
             try
             {
-                var newFilename = Path.GetFileNameWithoutExtension(filename)
+                newFilename = Path.GetFileNameWithoutExtension(srcFilePath)
                     + " - " + index.ToString($"D{imgColl.Count.ToString().Length}")
                     + ".png";
                 var destFilePath = Path.Combine(destFolder, newFilename);
@@ -532,7 +458,7 @@ public static class PhotoCodec
             catch (OperationCanceledException) { break; }
             catch { }
 
-            yield return index;
+            yield return (index, newFilename);
         }
     }
 
@@ -543,7 +469,7 @@ public static class PhotoCodec
     /// <param name="srcBitmap">Source bitmap</param>
     /// <param name="srcExt">Source file extension, example: .png</param>
     /// <param name="destFilePath">Destination file</param>
-    public static async Task SaveAsBase64Async(WicBitmapSource? srcBitmap, string srcExt, string destFilePath, CancellationToken token = default)
+    public static async Task SaveAsBase64Async(WicBitmapSource? srcBitmap, string srcExt, string destFilePath, ImgTransform? transform = null, CancellationToken token = default)
     {
         if (srcBitmap == null) return;
 
@@ -553,6 +479,9 @@ public static class PhotoCodec
 
         try
         {
+            token.ThrowIfCancellationRequested();
+            TransformImage(srcBitmap, transform);
+
             token.ThrowIfCancellationRequested();
 
             // convert bitmap to base64
@@ -573,14 +502,14 @@ public static class PhotoCodec
 
 
     /// <summary>
-    /// Saves image file as base64. Uses Magick.NET if <paramref name="changes"/>
+    /// Saves image file as base64. Uses Magick.NET if <paramref name="transform"/>
     /// has changes. Uses Stream if the format is supported, else uses Magick.NET.
     /// </summary>
     /// <param name="srcFilePath">Source file path</param>
     /// <param name="destFilePath">Destination file path</param>
-    public static async Task SaveAsBase64Async(string srcFilePath, string destFilePath, CodecReadOptions readOptions, IgImgChanges? changes = null, CancellationToken token = default)
+    public static async Task SaveAsBase64Async(string srcFilePath, string destFilePath, CodecReadOptions readOptions, ImgTransform? transform = null, CancellationToken token = default)
     {
-        if (changes.HasChanges)
+        if (transform.HasChanges)
         {
             using var imgC = new MagickImageCollection();
             imgC.Ping(srcFilePath);
@@ -588,12 +517,12 @@ public static class PhotoCodec
             if (imgC.Count == 1)
             {
                 using var imgM = imgC[0];
-                ApplyIgImgChanges(imgM, changes);
+                TransformImage(imgM, transform);
 
                 using var wicSrc = BHelper.ToWicBitmapSource(imgM.ToBitmapSource());
                 var ext = Path.GetExtension(srcFilePath);
 
-                await SaveAsBase64Async(wicSrc, ext, destFilePath, token);
+                await SaveAsBase64Async(wicSrc, ext, destFilePath, null, token);
                 return;
             }
         }
@@ -634,44 +563,69 @@ public static class PhotoCodec
 
 
             // for not supported formats
-            var bmp = await LoadAsync(srcFilePath, readOptions, changes, token);
-            await SaveAsBase64Async(bmp.Image, srcExt, destFilePath, token);
+            var bmp = await LoadAsync(srcFilePath, readOptions, transform, token);
+            await SaveAsBase64Async(bmp.Image, srcExt, destFilePath, null, token);
         }
         catch (OperationCanceledException) { }
     }
 
 
     /// <summary>
-    /// Applies changes from <see cref="IgImgChanges"/>.
+    /// Applies changes from <see cref="ImgTransform"/>.
     /// </summary>
-    public static void ApplyIgImgChanges(WicBitmapSource? bmpSrc, IgImgChanges? changes)
+    public static void TransformImage(WicBitmapSource? bmpSrc, ImgTransform? transform)
     {
-        if (bmpSrc == null || changes == null) return;
+        if (bmpSrc == null || transform == null) return;
 
         // list of flips
         var flips = new List<WICBitmapTransformOptions>();
-        if (changes.Flips.HasFlag(FlipOptions.Horizontal))
+        if (transform.Flips.HasFlag(FlipOptions.Horizontal))
         {
             flips.Add(WICBitmapTransformOptions.WICBitmapTransformFlipHorizontal);
         }
-        if (changes.Flips.HasFlag(FlipOptions.Vertical))
+        if (transform.Flips.HasFlag(FlipOptions.Vertical))
         {
             flips.Add(WICBitmapTransformOptions.WICBitmapTransformFlipVertical);
         }
 
 
         // apply flips
-        flips.ForEach(flip => bmpSrc.Rotate(flip));
+        foreach (var flip in flips)
+        {
+            bmpSrc.FlipRotate(flip);
+        }
+
 
         // rotate
-        if (changes.Rotation != 0)
+        var rotate = transform.Rotation switch
         {
-            // TODO:
-        }
+            90 => WICBitmapTransformOptions.WICBitmapTransformRotate90,
+            -270 => WICBitmapTransformOptions.WICBitmapTransformRotate90,
+
+            -90 => WICBitmapTransformOptions.WICBitmapTransformRotate270,
+            270 => WICBitmapTransformOptions.WICBitmapTransformRotate270,
+
+            180 => WICBitmapTransformOptions.WICBitmapTransformRotate180,
+            -180 => WICBitmapTransformOptions.WICBitmapTransformRotate180,
+
+            _ => WICBitmapTransformOptions.WICBitmapTransformRotate0,
+        };
+
+        if (rotate == WICBitmapTransformOptions.WICBitmapTransformRotate0) return;
+        bmpSrc.FlipRotate(rotate);
     }
 
 
-    #endregion
+    /// <summary>
+    /// Initialize Magick.NET.
+    /// </summary>
+    public static void InitMagickNET()
+    {
+        OpenCL.IsEnabled = true;
+        ResourceLimits.LimitMemory(new Percentage(75));
+    }
+
+    #endregion // Public functions
 
 
 
@@ -680,11 +634,11 @@ public static class PhotoCodec
     /// <summary>
     /// Read image file using stream
     /// </summary>
-    private static (bool loadSuccessful, IgImgData result, string ext, MagickReadSettings settings) ReadWithStream(string filePath, CodecReadOptions? options = null, IgImgChanges? changes = null)
+    private static (bool loadSuccessful, IgImgData result, string ext, MagickReadSettings settings) ReadWithStream(string filePath, CodecReadOptions? options = null, ImgTransform? transform = null)
     {
         options ??= new();
         var loadSuccessful = true;
-        
+
         var metadata = LoadMetadata(filePath, options);
         var ext = Path.GetExtension(filePath).ToUpperInvariant();
         var settings = ParseSettings(options, filePath);
@@ -715,12 +669,13 @@ public static class PhotoCodec
 
                     if (result.FrameCount == 1)
                     {
-                        ApplyIgImgChanges(result.Image, changes);
+                        TransformImage(result.Image, transform);
                     }
                 }
                 break;
 
             case ".GIF":
+            case ".GIFV":
             case ".FAX":
                 try
                 {
@@ -733,6 +688,28 @@ public static class PhotoCodec
                     {
                         result.Image = WicBitmapSource.Load(filePath);
                     }
+                }
+                catch
+                {
+                    loadSuccessful = false;
+                }
+                break;
+
+            case ".WEBP":
+                try
+                {
+                    using var webp = new WebPWrapper();
+                    var aniWebP = webp.AnimLoad(filePath);
+
+                    var ms = new MemoryStream();
+                    using var gif = new GifEncoder(ms);
+
+                    foreach (var frame in aniWebP)
+                    {
+                        gif.AddFrame(frame.Bitmap, frameDelay: TimeSpan.FromMilliseconds(frame.Duration));
+                    }
+
+                    result.Bitmap = new Bitmap(ms);
                 }
                 catch
                 {
@@ -776,7 +753,7 @@ public static class PhotoCodec
                 }
             }
         }
-        
+
 
         return (loadSuccessful, result, ext, settings);
     }
@@ -786,29 +763,9 @@ public static class PhotoCodec
     /// Loads image file with Magick.NET
     /// </summary>
     private static async Task<IgImgData> LoadWithMagickImageAsync(string filename, string ext,
-        MagickReadSettings settings, CodecReadOptions options, IgImgChanges? changes, CancellationToken cancelToken)
+        MagickReadSettings settings, CodecReadOptions options, ImgTransform? transform, CancellationToken cancelToken)
     {
-        var data = await ReadMagickImageAsync(filename, ext, settings, options, changes, cancelToken);
-        var result = new IgImgData(data);
-
-        return result;
-    }
-
-
-    public static void InitMagickNET()
-    {
-        OpenCL.IsEnabled = true;
-        ResourceLimits.LimitMemory(new Percentage(75));
-    }
-
-
-    /// <summary>
-    /// Loads image file with Magick.NET
-    /// </summary>
-    private static IgImgData LoadWithMagickImage(string filename, string ext,
-        MagickReadSettings settings, CodecReadOptions options, IgImgChanges? changes = null)
-    {
-        var data = ReadMagickImage(filename, ext, settings, options, changes);
+        var data = await ReadMagickImageAsync(filename, ext, settings, options, transform, cancelToken);
         var result = new IgImgData(data);
 
         return result;
@@ -819,7 +776,7 @@ public static class PhotoCodec
     /// Reads and processes image file with Magick.NET
     /// </summary>
     private static async Task<IgMagickReadData> ReadMagickImageAsync(
-        string filename, string ext, MagickReadSettings settings, CodecReadOptions options, IgImgChanges? changes, CancellationToken cancelToken)
+        string filename, string ext, MagickReadSettings settings, CodecReadOptions options, ImgTransform? transform, CancellationToken cancelToken)
     {
         var result = new IgMagickReadData() { Extension = ext };
         var imgColl = new MagickImageCollection();
@@ -915,124 +872,12 @@ public static class PhotoCodec
         imgM = ApplyColorChannel(imgM, options);
 
         // apply final changes
-        ApplyIgImgChanges(imgM, changes);
+        TransformImage(imgM, transform);
 
         result.SingleFrameImage = imgM;
         result.ColorProfile = processResult.ColorProfile;
         result.ExifProfile = processResult.ExifProfile;
 
-
-        imgColl.Dispose();
-
-        return result;
-    }
-
-
-    /// <summary>
-    /// Loads and processes image file with Magick.NET
-    /// </summary>
-    private static IgMagickReadData ReadMagickImage(string filename, string ext, MagickReadSettings settings, CodecReadOptions options, IgImgChanges? changes = null)
-    {
-        var result = new IgMagickReadData() { Extension = ext };
-        var imgColl = new MagickImageCollection();
-
-        // Issue #530: ImageMagick falls over if the file path is longer than the (old)
-        // windows limit of 260 characters. Workaround is to read the file bytes,
-        // but that requires using the "long path name" prefix to succeed.
-        if (filename.Length > 260)
-        {
-            var newFilename = BHelper.PrefixLongPath(filename);
-            var allBytes = File.ReadAllBytes(newFilename);
-
-            imgColl.Ping(allBytes, settings);
-        }
-        else
-        {
-            imgColl.Ping(filename, settings);
-        }
-
-        // standardize first frame reading option
-        result.FrameCount = imgColl.Count;
-        bool readFirstFrameOnly;
-
-        if (options.FirstFrameOnly == null)
-        {
-            readFirstFrameOnly = imgColl.Count < 2;
-        }
-        else
-        {
-            readFirstFrameOnly = options.FirstFrameOnly.Value;
-        }
-
-
-        // read all frames
-        if (imgColl.Count > 1 && readFirstFrameOnly is false)
-        {
-            imgColl.Read(filename, settings);
-
-            foreach (var imgPageM in imgColl)
-            {
-                ProcessMagickImage((MagickImage)imgPageM, options, ext, false);
-            }
-
-            result.MultiFrameImage = imgColl;
-            return result;
-        }
-
-
-        // read a single frame only
-        var imgM = new MagickImage();
-        var hasRequestedThumbnail = false;
-
-        if (options.UseEmbeddedThumbnailRawFormats is true)
-        {
-            var profile = imgColl[0].GetProfile("dng:thumbnail");
-
-            try
-            {
-                // try to get thumbnail
-                var thumbnailData = profile?.GetData();
-                if (thumbnailData != null)
-                {
-                    imgM.Ping(thumbnailData);
-
-                    // check min size
-                    if (imgM.Width > options.EmbeddedThumbnailMinWidth
-                        && imgM.Height > options.EmbeddedThumbnailMinHeight)
-                    {
-                        imgM.Read(thumbnailData, settings);
-                        hasRequestedThumbnail = true;
-                    }
-                }
-            }
-            catch { }
-        }
-
-        if (!hasRequestedThumbnail)
-        {
-            imgM.Read(filename, settings);
-        }
-
-
-        // process image
-        var processResult = ProcessMagickImage(imgM, options, ext, true);
-
-        if (processResult.ThumbM != null)
-        {
-            imgM = processResult.ThumbM;
-        }
-
-
-        // apply color channel
-        imgM = ApplyColorChannel(imgM, options);
-
-        // apply final changes
-        ApplyIgImgChanges(imgM, changes);
-
-
-        result.SingleFrameImage = imgM;
-        result.ColorProfile = processResult.ColorProfile;
-        result.ExifProfile = processResult.ExifProfile;
 
         imgColl.Dispose();
 
@@ -1044,7 +889,6 @@ public static class PhotoCodec
     /// Processes single-frame Magick image
     /// </summary>
     /// <param name="refImgM">Input Magick image to process</param>
-    /// <returns></returns>
     private static (IColorProfile? ColorProfile, IExifProfile? ExifProfile, MagickImage? ThumbM) ProcessMagickImage(MagickImage refImgM, CodecReadOptions options, string ext, bool requestThumbnail)
     {
         IColorProfile? colorProfile = null;
@@ -1105,6 +949,13 @@ public static class PhotoCodec
                         colorProfile ?? ColorProfile.SRGB,
                         imgColor);
                 }
+            }
+
+
+            // make sure the output color space is not CMYK
+            if (refImgM.ColorSpace == ColorSpace.CMYK)
+            {
+                refImgM.ColorSpace = ColorSpace.sRGB;
             }
         }
 
@@ -1233,26 +1084,26 @@ public static class PhotoCodec
 
 
     /// <summary>
-    /// Applies changes from <see cref="IgImgChanges"/>.
+    /// Applies changes from <see cref="ImgTransform"/>.
     /// </summary>
-    private static void ApplyIgImgChanges(IMagickImage imgM, IgImgChanges? changes = null)
+    private static void TransformImage(IMagickImage imgM, ImgTransform? transform = null)
     {
-        if (changes == null) return;
+        if (transform == null) return;
+
+        // rotate
+        if (transform.Rotation != 0)
+        {
+            imgM.Rotate(transform.Rotation);
+        }
 
         // flip
-        if (changes.Flips.HasFlag(FlipOptions.Horizontal))
-        {
-            imgM.Flip();
-        }
-        if (changes.Flips.HasFlag(FlipOptions.Vertical))
+        if (transform.Flips.HasFlag(FlipOptions.Horizontal))
         {
             imgM.Flop();
         }
-
-        // rotate
-        if (changes.Rotation != 0)
+        if (transform.Flips.HasFlag(FlipOptions.Vertical))
         {
-            imgM.Rotate(changes.Rotation);
+            imgM.Flip();
         }
     }
 
@@ -1260,9 +1111,6 @@ public static class PhotoCodec
     /// <summary>
     /// Parse <see cref="CodecReadOptions"/> to <see cref="MagickReadSettings"/>
     /// </summary>
-    /// <param name="options"></param>
-    /// <param name="filename"></param>
-    /// <returns></returns>
     private static MagickReadSettings ParseSettings(CodecReadOptions? options, string filename = "")
     {
         options ??= new();
@@ -1353,7 +1201,7 @@ public static class PhotoCodec
     }
 
 
-    #endregion
+    #endregion // Private functions
 
 
 }

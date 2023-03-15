@@ -1,6 +1,6 @@
 ﻿/*
 ImageGlass Project - Image viewer for Windows
-Copyright (C) 2010 - 2022 DUONG DIEU PHAP
+Copyright (C) 2010 - 2023 DUONG DIEU PHAP
 Project homepage: https://imageglass.org
 
 This program is free software: you can redistribute it and/or modify
@@ -30,7 +30,6 @@ public static class DirectoryFinder
     /// <param name="rootDir">Starting directory</param>
     /// <param name="searchAllDirectories">When true, all sub directories will be searched as well</param>
     /// <param name="filterFn">Filter to be done on directory. use null for no filtering</param>
-    /// <returns></returns>
     public static ConcurrentBag<string> FindDirectories(string rootDir,
         bool searchAllDirectories, Predicate<string>? filterFn = null)
     {
@@ -91,7 +90,6 @@ public static class DirectoryFinder
     /// <param name="rootDir">Starting directory</param>
     /// <param name="searchAllDirectories">When true, all sub directories will be searched as well</param>
     /// <param name="filterFn">Filter function to be done on files/directory. Use null for no filtering</param>
-    /// <returns></returns>
     public static ConcurrentBag<string> FindFiles(string rootDir,
         bool searchAllDirectories, Predicate<FileInfo>? filterFn = null)
     {
