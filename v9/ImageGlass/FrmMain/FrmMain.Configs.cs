@@ -45,7 +45,7 @@ public partial class FrmMain
         { nameof(MnuNewWindow),             new() { new (Keys.Control | Keys.N) } },
         { nameof(MnuSave),                  new() { new (Keys.Control | Keys.S) } },
         { nameof(MnuSaveAs),                new() { new (Keys.Control | Keys.Shift | Keys.S) } },
-        { nameof(MnuOpenWith),              new() { new (Keys.D) } },
+        // { nameof(MnuOpenWith),              new() { new (Keys.D) } },   // MK2k: "WASD" - D is already taken
         { nameof(MnuEdit),                  new() { new (Keys.E) } },
         { nameof(MnuPrint),                 new() { new (Keys.Control | Keys.P) } },
         { nameof(MnuShare),                 new() { new (Keys.S) } },
@@ -55,8 +55,8 @@ public partial class FrmMain
         { nameof(MnuUnload),                new() { new (Keys.U) } },
 
         // MnuNavigation
-        { nameof(MnuViewNext),              new() { new (Keys.Right) } },
-        { nameof(MnuViewPrevious),          new() { new (Keys.Left) } },
+        { nameof(MnuViewNext),              new() { new (Keys.Right), new (Keys.D) } }, // MK2k: "WASD" - use D to view next image
+        { nameof(MnuViewPrevious),          new() { new (Keys.Left), new (Keys.A) } },  // MK2k: "WASD" - use A to view previous image
         { nameof(MnuGoTo),                  new() { new (Keys.G) } },
         { nameof(MnuGoToFirst),             new() { new (Keys.Home) } },
         { nameof(MnuGoToLast),              new() { new (Keys.End) } },
