@@ -45,7 +45,7 @@ public partial class FrmMain
         { nameof(MnuNewWindow),             new() { new (Keys.Control | Keys.N) } },
         { nameof(MnuSave),                  new() { new (Keys.Control | Keys.S) } },
         { nameof(MnuSaveAs),                new() { new (Keys.Control | Keys.Shift | Keys.S) } },
-        // { nameof(MnuOpenWith),              new() { new (Keys.D) } },   // MK2k: "WASD" - D is already taken
+        { nameof(MnuOpenWith),              new() { new (Keys.Enter) } },                   // MK2k: "WASD" - D is already taken, we use Enter
         { nameof(MnuEdit),                  new() { new (Keys.E) } },
         { nameof(MnuPrint),                 new() { new (Keys.Control | Keys.P) } },
         { nameof(MnuShare),                 new() { new (Keys.S) } },
