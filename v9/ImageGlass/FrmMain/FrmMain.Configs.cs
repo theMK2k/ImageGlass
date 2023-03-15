@@ -104,8 +104,8 @@ public partial class FrmMain
         { nameof(MnuImageProperties),       new() { new (Keys.Control | Keys.I) } },
 
         // MnuClipboard
-        { nameof(MnuCopyImageData),         new() { new (Keys.Control | Keys.C) } },
-        { nameof(MnuCopyFile),              new() { new (Keys.Control | Keys.Shift | Keys.C) } },
+        { nameof(MnuCopyImageData),         new() { new (Keys.Control | Keys.Shift | Keys.C) } },   // MK2k: copy image content with ctrl+shift+c
+        { nameof(MnuCopyFile),              new() { new (Keys.Control | Keys.C) } },                // MK2k: copy file with ctrl+c
         { nameof(MnuCutFile),               new() { new (Keys.Control | Keys.X) } },
         { nameof(MnuCopyPath),              new() { new (Keys.Control | Keys.L) } },
         { nameof(MnuClearClipboard),        new() { new (Keys.Control | Keys.Oemtilde) } }, // Ctrl+`
